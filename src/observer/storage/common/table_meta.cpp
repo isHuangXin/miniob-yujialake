@@ -123,8 +123,9 @@ const FieldMeta *TableMeta::field(const char *name) const
   if (nullptr == name) {
     return nullptr;
   }
+
   for (const FieldMeta &field : fields_) {
-    if (0 == strcmp(field.name(), name)) {
+    if (0 == strcasecmp(field.name(), name)) {
       return &field;
     }
   }

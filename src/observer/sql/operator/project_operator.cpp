@@ -50,12 +50,20 @@ Tuple *ProjectOperator::current_tuple()
   return &tuple_;
 }
 
-void ProjectOperator::add_projection(const Table *table, const FieldMeta *field_meta)
+void ProjectOperator::add_projection(const Table *table, const FieldMeta *field_meta, bool is_multi_mode = false)
 {
   // 对单表来说，展示的(alias) 字段总是字段名称，
   // 对多表查询来说，展示的alias 需要带表名字
   TupleCellSpec *spec = new TupleCellSpec(new FieldExpr(table, field_meta));
-  spec->set_alias(field_meta->name());
+  if (is_multi_mode) {
+    const char *table_name = table->name();
+    const char *field_name = field_meta->name();
+    char *name = (char *)malloc(strlen(table_name) + strlen(field_name) + 1);
+    sprintf(name, "%s.%s", table_name, field_name);
+    spec->set_alias(name);
+  } else {
+    spec->set_alias(field_meta->name());
+  }
   tuple_.add_cell_spec(spec);
 }
 

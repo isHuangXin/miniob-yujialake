@@ -19,17 +19,25 @@ See the Mulan PSL v2 for more details. */
 #include "rc.h"
 
 // TODO fixme
-class JoinOperator : public Operator
-{
+class JoinOperator : public Operator {
 public:
-  JoinOperator(Operator *left, Operator *right)
+  JoinOperator(Operator *left, Operator *right) : left_(left), right_(right)
   {}
 
-  virtual ~JoinOperator() = default;
+  virtual ~JoinOperator()
+  {
+    if (left_) {
+      delete left_;
+    }
+    if (right_) {
+      delete right_;
+    }
+  }
 
   RC open() override;
   RC next() override;
   RC close() override;
+  Tuple *current_tuple() override;
 
 private:
   Operator *left_ = nullptr;
