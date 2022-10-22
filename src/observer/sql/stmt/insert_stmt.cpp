@@ -65,6 +65,7 @@ RC InsertStmt::create(Db *db, const Inserts &inserts, Stmt *&stmt)
       } else if (field_type == CHARS && value_type == INTS) {
         /*截断，超过9999的数字直接进行截断，对于负数的话，要保留前面的负号*/
         int int_value = *((int*)(values[i].data));
+        // values[i].data = malloc(8);
         char *temp_chars = new char[4];
         if (int_value != 0) {
           int is_negative = int_value < 0;
@@ -150,6 +151,10 @@ RC InsertStmt::create(Db *db, const Inserts &inserts, Stmt *&stmt)
 		            int t = (10*xxx+5)/10;
                 temp_chars[st] = '0' + t;
                 decimal_value = (decimal_value * 10) - t;
+              }
+              if (st < 4){
+                temp_chars[st] = '\0';
+                st++;
               }
             } else {
               temp_chars[st] = '\0';
