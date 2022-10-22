@@ -61,6 +61,7 @@ int TupleCell::compare(const TupleCell &other) const
     float other_data = *(int *)other.data_;
     return compare_float(data_, &other_data);
   } else if (this->attr_type_ == CHARS && other.attr_type_ == INTS) {
+    //TODO:select * from  t where '1.5a'=2;
     int this_data = chars_to_ints(this->data_);
     return compare_int(&this_data, other.data_);
   } else if (this->attr_type_ == INTS && other.attr_type_ == CHARS) {

@@ -135,7 +135,7 @@ void ExecuteStage::handle_request(common::StageEvent *event)
   Query *sql = sql_event->query();
 
   if (stmt != nullptr) {
-    switch (stmt->type()) {// rb bt 
+    switch (stmt->type()) {
     case StmtType::SELECT: {
       do_select(sql_event);
     } break;
