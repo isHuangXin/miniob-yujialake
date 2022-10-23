@@ -96,6 +96,7 @@ private:
   IndexScanner *find_index_for_scan(const ConditionFilter *filter);
   IndexScanner *find_index_for_scan(const DefaultConditionFilter &filter);
   RC insert_record(Trx *trx, Record *record);
+  RC update_record_one_attr(Trx *trx, Record *record, const FieldMeta *table_meta, const Value *value);
 
 public:
   RC recover_insert_record(Record *record);
