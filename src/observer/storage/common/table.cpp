@@ -120,6 +120,50 @@ RC Table::create(
   return rc;
 }
 
+RC Table::drop(const char *name, const char *base_dir)
+{
+  RC rc = sync();
+  if (nullptr == name || common::is_blank(name)) {
+    LOG_WARN("Name cannot be empty");
+    return RC::INVALID_ARGUMENT;
+  }
+  LOG_INFO("Begin to drop table %s:%s", base_dir, name);
+
+  // drop meta data file
+  std::string table_meta_path = table_meta_file(base_dir, name);
+  if (std::remove(table_meta_path.c_str()) != 0) {
+    LOG_ERROR("Cannot remove meta data of table %s", name);
+    return RC::GENERIC_ERROR;
+  }
+
+  // drop table data file
+  std::string table_data_path = table_data_file(base_dir, name);
+  if (std::remove(table_data_path.c_str()) != 0) {
+    LOG_ERROR("Cannot remove file data of table %s", name);
+    return RC::GENERIC_ERROR;
+  }
+
+   // drop index data file
+  for (int i = 0; i < indexes_.size(); i++) {
+    std::string index_file = table_index_file(base_dir_.c_str(), name, indexes_[i]->index_meta().name());
+    // 也许 dynamic_cast 更好
+    rc = reinterpret_cast<BplusTreeIndex *>(indexes_[i])->close();
+    if (rc != RC::SUCCESS) {
+      LOG_ERROR("Failed to close disk buffer pool of index file. file name=%s", index_file.c_str());
+      return rc;
+    }
+    if (std::remove(index_file.c_str()) == -1) {
+      LOG_ERROR("Failed to drop disk buffer pool of index file. file name=%s", index_file.c_str());
+      return RC::GENERIC_ERROR;
+    }
+    if (rc != RC::SUCCESS) {
+      LOG_ERROR("Failed to drop disk buffer pool of index file. file name=%s", index_file.c_str());
+      return rc;
+    }
+  }
+  return rc;
+}
+
 RC Table::open(const char *meta_file, const char *base_dir, CLogManager *clog_manager)
 {
   // 加载元数据文件
@@ -638,10 +682,88 @@ RC Table::create_index(Trx *trx, const char *index_name, const char *attribute_n
   return rc;
 }
 
+// just for one field change
+class RecordUpdater {
+public:
+  RecordUpdater(Table &table, Trx *trx, const FieldMeta *fieldMeta, const Value *value) :
+  table_(table), trx_(trx), fieldMeta_(fieldMeta), value_(value) { }
+
+  RC update_record(Record *record) {
+    RC rc = RC::SUCCESS;
+    rc = table_.update_record_one_attr(trx_, record, fieldMeta_, value_);
+    if (rc == RC::SUCCESS) {
+      updated_count_++;
+    }
+    return rc;
+  }
+
+  int updated_count() const {
+    return updated_count_;
+  }
+
+private:
+  Table & table_;
+  Trx *trx_;
+  int updated_count_ = 0;
+  const FieldMeta *fieldMeta_;
+  const Value *value_;
+};
+
+static RC record_reader_update_adapter(Record *record, void *context) {
+  RecordUpdater &record_updater = *(RecordUpdater *)context;
+  return record_updater.update_record(record);
+}
+
 RC Table::update_record(Trx *trx, const char *attribute_name, const Value *value, int condition_num,
     const Condition conditions[], int *updated_count)
 {
-  return RC::GENERIC_ERROR;
+  CompositeConditionFilter condition_filter;
+  RC rc = condition_filter.init(*this, conditions, condition_num);
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
+  ConditionFilter *filter = &condition_filter;
+
+  // check attr name & type
+  const FieldMeta *fieldMeta;
+  if ((fieldMeta = table_meta_.field(attribute_name)) == nullptr) {
+    return RC::SCHEMA_FIELD_NOT_EXIST;
+  }
+
+  if (fieldMeta->type() != value->type) {
+    return RC::SCHEMA_FIELD_NOT_EXIST;
+  }
+
+  RecordUpdater updater(*this, trx, fieldMeta, value);
+  rc = scan_record(trx, filter, -1, &updater, record_reader_update_adapter);
+  *updated_count = updater.updated_count();
+  return RC::SUCCESS;
+}
+
+RC Table::update_record_one_attr(Trx *trx, Record *record, const FieldMeta *fieldMeta, const Value *value) {
+  RC rc = RC::SUCCESS;
+  // 这里不考虑事务，直接原地修改
+  // index应该是多余的，先保留
+  rc = record_handler_->get_record(&(record->rid()), record);
+  rc = delete_entry_of_indexes(record->data(), record->rid(), false);// 重复代码 refer to commit_delete
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to update phase 1 indexes of record (rid=%d.%d). rc=%d:%s",
+              record->rid().page_num, record->rid().slot_num, rc, strrc(rc));
+    return rc;
+  }
+
+  memcpy(record->data() + fieldMeta->offset(), value->data, fieldMeta->len());
+  rc = record_handler_->update_record(record);
+  rc = insert_entry_of_indexes(record->data(), record->rid());
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to update phase 2 indexes of record (rid=%d.%d). rc=%d:%s",
+              record->rid().page_num, record->rid().slot_num, rc, strrc(rc));
+    return rc;
+  }
+  rc = record_handler_->get_record(&(record->rid()), record);
+  memcpy(record->data() + fieldMeta->offset(), value->data, fieldMeta->len());
+  rc = record_handler_->update_record(record);
+  return rc;
 }
 
 class RecordDeleter {

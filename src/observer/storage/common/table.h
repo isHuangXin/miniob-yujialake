@@ -48,6 +48,7 @@ public:
   RC create(const char *path, const char *name, const char *base_dir, int attribute_count, const AttrInfo attributes[],
       CLogManager *clog_manager);
 
+  RC drop(const char *name, const char *base_dir);
   /**
    * 打开一个表
    * @param meta_file 保存表元数据的文件完整路径
@@ -96,6 +97,7 @@ private:
   IndexScanner *find_index_for_scan(const ConditionFilter *filter);
   IndexScanner *find_index_for_scan(const DefaultConditionFilter &filter);
   RC insert_record(Trx *trx, Record *record);
+  RC update_record_one_attr(Trx *trx, Record *record, const FieldMeta *table_meta, const Value *value);
 
 public:
   RC recover_insert_record(Record *record);
