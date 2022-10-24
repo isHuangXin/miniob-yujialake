@@ -12,6 +12,7 @@ See the Mulan PSL v2 for more details. */
 // Created by wangyunlai on 2021/6/11.
 //
 
+#include <cctype>
 #include <string.h>
 #include <algorithm>
 
@@ -56,4 +57,27 @@ int compare_string(void *arg1, int arg1_max_length, void *arg2, int arg2_max_len
     return 0 - s2[maxlen];
   }
   return 0;
+}
+
+bool match_string(const char *lhs, const char *rhs)
+{
+  int m = strlen(lhs), n = strlen(rhs);
+  int dp[m + 1][n + 1];
+  memset(dp, 0, sizeof(dp));
+  dp[0][0] = true;
+  for (int i = 1; i <= n; ++i) {
+    if (rhs[i - 1] == '%')
+      dp[0][i] = true;
+    else
+      break;
+  }
+  for (int i = 1; i <= m; ++i) {
+    for (int j = 1; j <= n; ++j) {
+      if (rhs[j - 1] == '%')
+        dp[i][j] = dp[i][j - 1] | dp[i - 1][j];
+      else if (rhs[j - 1] == '_' || toupper(lhs[i - 1]) == toupper(rhs[j - 1]))
+        dp[i][j] = dp[i - 1][j - 1];
+    }
+  }
+  return dp[m][n];
 }

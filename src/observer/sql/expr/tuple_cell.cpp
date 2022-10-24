@@ -77,3 +77,15 @@ int TupleCell::compare(const TupleCell &other) const
   LOG_WARN("not supported");
   return -1; // TODO return rc?
 }
+
+int TupleCell::compare_like(const TupleCell &other) const
+{
+
+  if (this->attr_type_ == other.attr_type_ && this->attr_type_ == CHARS) {
+    // 字段为char(x)时this->length_为x，非data实际长度，所以这里使用
+    return match_string(this->data_, other.data_) ? 0 : 1;
+  }
+
+  LOG_WARN("not supported");
+  return -1;
+}

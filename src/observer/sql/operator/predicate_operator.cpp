@@ -74,15 +74,23 @@ bool PredicateOperator::do_predicate(RowTuple &tuple)
     left_expr->get_value(tuple, left_cell);
     right_expr->get_value(tuple, right_cell);
 
-    const int compare = left_cell.compare(right_cell);
+    bool like_cmp = (comp == LIKE || comp == NOT_LIKE);
+    int compare = 1;
+    if (like_cmp) {
+      compare = left_cell.compare_like(right_cell);
+    } else {
+      compare = left_cell.compare(right_cell);
+    }
     bool filter_result = false;
     switch (comp) {
+    case LIKE:
     case EQUAL_TO: {
       filter_result = (0 == compare); 
     } break;
     case LESS_EQUAL: {
-      filter_result = (compare <= 0); 
+      filter_result = (compare <= 0);
     } break;
+    case NOT_LIKE:
     case NOT_EQUAL: {
       filter_result = (compare != 0);
     } break;

@@ -16,17 +16,10 @@
 			"visible" : true
 		},
 		{
-			"len" : 4,
+			"len" : 20,
 			"name" : "name",
 			"offset" : 8,
 			"type" : "chars",
-			"visible" : true
-		},
-		{
-			"len" : 4,
-			"name" : "age",
-			"offset" : 12,
-			"type" : "floats",
 			"visible" : true
 		}
 	],
