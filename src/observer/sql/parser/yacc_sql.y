@@ -147,6 +147,7 @@ command:
 	| desc_table
 	| create_index	
 	| drop_index
+	| show_index
 	| sync
 	| begin
 	| commit
@@ -224,6 +225,13 @@ drop_index:			/*drop index 语句的语法解析树*/
 			drop_index_init(&CONTEXT->ssql->sstr.drop_index, $3);
 		}
     ;
+show_index:			/*show index 语句的语法解析树*/
+	SHOW INDEX FROM ID SEMICOLON
+		{
+			CONTEXT->ssql->flag=SCF_SHOW_INDEX;//"show_index";
+			show_index_init(&CONTEXT->ssql->sstr.show_index, $4);
+		}
+	;
 create_table:		/*create table 语句的语法解析树*/
     CREATE TABLE ID LBRACE attr_def attr_def_list RBRACE SEMICOLON 
 		{

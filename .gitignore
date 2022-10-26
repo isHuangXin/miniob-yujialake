@@ -20,4 +20,8 @@ GTAGS
 miniob/
 observer.log.*
 miniob/*
+*.index
+*.data
+*.table
+clog
 #*#

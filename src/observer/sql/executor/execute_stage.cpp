@@ -137,22 +137,22 @@ void ExecuteStage::handle_request(common::StageEvent *event)
 
   if (stmt != nullptr) {
     switch (stmt->type()) {
-    case StmtType::SELECT: {
-      do_select(sql_event);
-    } break;
-    case StmtType::INSERT: {
-      do_insert(sql_event);
-    } break;
-    case StmtType::UPDATE: {
-      //do_update((UpdateStmt *)stmt, session_event);
-      do_update(sql_event);
-    } break;
-    case StmtType::DELETE: {
-      do_delete(sql_event);
-    } break;
-    default: {
-      LOG_WARN("should not happen. please implenment");
-    } break;
+      case StmtType::SELECT: {
+        do_select(sql_event);
+      } break;
+      case StmtType::INSERT: {
+        do_insert(sql_event);
+      } break;
+      case StmtType::UPDATE: {
+        // do_update((UpdateStmt *)stmt, session_event);
+        do_update(sql_event);
+      } break;
+      case StmtType::DELETE: {
+        do_delete(sql_event);
+      } break;
+      default: {
+        LOG_WARN("should not happen. please implenment");
+      } break;
     }
   } else {
     switch (sql->flag) {
@@ -165,58 +165,60 @@ void ExecuteStage::handle_request(common::StageEvent *event)
       case SCF_CREATE_INDEX: {
         do_create_index(sql_event);
       } break;
+      case SCF_SHOW_INDEX: {
+        do_show_index(sql_event);
+      } break;
       case SCF_SHOW_TABLES: {
         do_show_tables(sql_event);
       } break;
       case SCF_DESC_TABLE: {
         do_desc_table(sql_event);
       } break;
-
-    case SCF_DROP_TABLE: {
-      do_drop_table(sql_event);
-    } break;
-    case SCF_DROP_INDEX:
-    case SCF_LOAD_DATA: {
-      default_storage_stage_->handle_event(event);
-    } break;
-    case SCF_SYNC: {
-      /*
-      RC rc = DefaultHandler::get_default().sync();
-      session_event->set_response(strrc(rc));
-      */
-    } break;
-    case SCF_BEGIN: {
-      do_begin(sql_event);
-      /*
-      session_event->set_response("SUCCESS\n");
-      */
-    } break;
-    case SCF_COMMIT: {
-      do_commit(sql_event);
-      /*
-      Trx *trx = session->current_trx();
-      RC rc = trx->commit();
-      session->set_trx_multi_operation_mode(false);
-      session_event->set_response(strrc(rc));
-      */
-    } break;
-    case SCF_CLOG_SYNC: {
-      do_clog_sync(sql_event);
-    }
-    case SCF_ROLLBACK: {
-      Trx *trx = session_event->get_client()->session->current_trx();
-      RC rc = trx->rollback();
-      session->set_trx_multi_operation_mode(false);
-      session_event->set_response(strrc(rc));
-    } break;
-    case SCF_EXIT: {
-      // do nothing
-      const char *response = "Unsupported\n";
-      session_event->set_response(response);
-    } break;
-    default: {
-      LOG_ERROR("Unsupported command=%d\n", sql->flag);
-    }
+      case SCF_DROP_TABLE: {
+        do_drop_table(sql_event);
+      } break;
+      case SCF_DROP_INDEX:
+      case SCF_LOAD_DATA: {
+        default_storage_stage_->handle_event(event);
+      } break;
+      case SCF_SYNC: {
+        /*
+        RC rc = DefaultHandler::get_default().sync();
+        session_event->set_response(strrc(rc));
+        */
+      } break;
+      case SCF_BEGIN: {
+        do_begin(sql_event);
+        /*
+        session_event->set_response("SUCCESS\n");
+        */
+      } break;
+      case SCF_COMMIT: {
+        do_commit(sql_event);
+        /*
+        Trx *trx = session->current_trx();
+        RC rc = trx->commit();
+        session->set_trx_multi_operation_mode(false);
+        session_event->set_response(strrc(rc));
+        */
+      } break;
+      case SCF_CLOG_SYNC: {
+        do_clog_sync(sql_event);
+      }
+      case SCF_ROLLBACK: {
+        Trx *trx = session_event->get_client()->session->current_trx();
+        RC rc = trx->rollback();
+        session->set_trx_multi_operation_mode(false);
+        session_event->set_response(strrc(rc));
+      } break;
+      case SCF_EXIT: {
+        // do nothing
+        const char *response = "Unsupported\n";
+        session_event->set_response(response);
+      } break;
+      default: {
+        LOG_ERROR("Unsupported command=%d\n", sql->flag);
+      }
     }
   }
 }
@@ -522,6 +524,35 @@ RC ExecuteStage::do_drop_table(SQLStageEvent *sql_event)
   return rc;
 }
 
+void print_index_header(std::stringstream &ss)
+{
+  ss << "Table | Non_unique | Key_name | Seq_in_index | Column_name\n";
+}
+
+RC ExecuteStage::do_show_index(SQLStageEvent *sql_event)
+{
+  SessionEvent *session_event = sql_event->session_event();
+  Db *db = session_event->session()->get_current_db();
+  Table *table = db->find_table(sql_event->query()->sstr.show_index.relation_name);
+  if (nullptr == table) {
+    session_event->set_response("FAILURE\n");
+    return RC::SCHEMA_TABLE_NOT_EXIST;
+  }
+  std::stringstream ss;
+  const TableMeta table_meta = table->table_meta();
+  int index_num = table_meta.index_num();
+  print_index_header(ss);
+  for (int i = 0; i < index_num; i++) {
+    // TODO:implement multi-index and unique index
+    ss << table_meta.name() << " | 1 | ";
+    ss << table_meta.index(i)->name() << " | ";
+    ss << "1 | " << table_meta.index(i)->field() << std::endl;
+  }
+  session_event->set_response(ss.str());
+  // session_event->set_response("SUCCESS\n");
+  return RC::SUCCESS;
+}
+
 RC ExecuteStage::do_show_tables(SQLStageEvent *sql_event)
 {
   SessionEvent *session_event = sql_event->session_event();
@@ -621,8 +652,8 @@ RC ExecuteStage::do_update(SQLStageEvent *sql_event)
   const char *table_name = updates.relation_name;
   const char *field_name = updates.attribute_name;
   int updated_count = 0;
-  RC rc = table->update_record(trx, field_name, &updates.value,
-              updates.condition_num, updates.conditions, &updated_count);
+  RC rc =
+      table->update_record(trx, field_name, &updates.value, updates.condition_num, updates.conditions, &updated_count);
   if (rc != RC::SUCCESS) {
     session_event->set_response("FAILURE\n");
   } else {
