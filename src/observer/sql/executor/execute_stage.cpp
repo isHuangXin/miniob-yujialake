@@ -163,6 +163,9 @@ void ExecuteStage::handle_request(common::StageEvent *event)
     case SCF_CREATE_INDEX: {
       do_create_index(sql_event);
     } break;
+    case SCF_SHOW_INDEX: {
+      do_show_index(sql_event);
+    } break;
     case SCF_SHOW_TABLES: {
       do_show_tables(sql_event);
     } break;
@@ -493,6 +496,34 @@ RC ExecuteStage::do_create_index(SQLStageEvent *sql_event)
   RC rc = table->create_index(nullptr, create_index.index_name, create_index.attribute_name);
   sql_event->session_event()->set_response(rc == RC::SUCCESS ? "SUCCESS\n" : "FAILURE\n");
   return rc;
+}
+
+void print_index_header(std::stringstream &ss) {
+  ss << "Table | Non_unique | Key_name | Seq_in_index | Column_name\n";
+}
+
+RC ExecuteStage::do_show_index(SQLStageEvent *sql_event) 
+{
+  SessionEvent *session_event = sql_event->session_event();
+  Db *db = session_event->session()->get_current_db();
+  Table *table = db->find_table(sql_event->query()->sstr.show_index.relation_name);
+  if (nullptr == table) {
+    session_event->set_response("FAILURE\n");
+    return RC::SCHEMA_TABLE_NOT_EXIST;
+  }
+  std::stringstream ss;
+  const TableMeta table_meta = table->table_meta();
+  int index_num = table_meta.index_num();
+  print_index_header(ss);
+  for (int i = 0 ; i < index_num; i++) {
+    // TODO:implement multi-index and unique index
+    ss << table_meta.name() << " | 0 | ";
+    ss << table_meta.index(i)->name() << " | ";
+    ss << "1 | " << table_meta.index(i)->field() << std::endl;
+  }
+  session_event->set_response(ss.str());
+  // session_event->set_response("SUCCESS\n");
+  return RC::SUCCESS;
 }
 
 RC ExecuteStage::do_show_tables(SQLStageEvent *sql_event)

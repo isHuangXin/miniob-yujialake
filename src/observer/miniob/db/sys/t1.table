@@ -24,12 +24,12 @@
 		},
 		{
 			"len" : 4,
-			"name" : "age",
+			"name" : "year",
 			"offset" : 12,
 			"type" : "floats",
 			"visible" : true
 		}
 	],
 	"indexes" : null,
-	"table_name" : "t"
+	"table_name" : "t1"
 }

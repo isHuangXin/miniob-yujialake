@@ -21,15 +21,18 @@
 			"offset" : 8,
 			"type" : "chars",
 			"visible" : true
-		},
-		{
-			"len" : 4,
-			"name" : "age",
-			"offset" : 12,
-			"type" : "floats",
-			"visible" : true
 		}
 	],
-	"indexes" : null,
-	"table_name" : "t"
+	"indexes" : 
+	[
+		{
+			"field_name" : "id",
+			"name" : "id_index"
+		},
+		{
+			"field_name" : "name",
+			"name" : "name_index"
+		}
+	],
+	"table_name" : "t3"
 }

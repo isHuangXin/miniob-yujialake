@@ -2728,3 +2728,7 @@ ThreadPools=SQLThreads,IOThreads,D
 [2022-10-22 12:44:55 pid:126770 tid:7fffddffb700  INFO: log_reporter.cpp report 36]>>SessionStage.readsocket:mean:0,tps:0.015873
 [2022-10-22 12:44:55 pid:126770 tid:7fffddffb700  INFO: log_reporter.cpp report 36]>>SessionStage.sql:mean:0,tps:0
 [2022-10-22 12:44:55 pid:126770 tid:7fffddffb700  INFO: log_reporter.cpp report 36]>>SessionStage.writesocket:mean:0,tps:0
+[2022-10-22 13:50:15 pid:126770 tid:7fffdd7fa700  INFO: log_reporter.cpp report 36]>>DefaultStorageStage.query:mean:0,tps:0
+[2022-10-22 13:50:15 pid:126770 tid:7fffdd7fa700  INFO: log_reporter.cpp report 36]>>SessionStage.readsocket:mean:0,tps:0
+[2022-10-22 13:50:15 pid:126770 tid:7fffdd7fa700  INFO: log_reporter.cpp report 36]>>SessionStage.sql:mean:0,tps:0
+[2022-10-22 13:50:15 pid:126770 tid:7fffdd7fa700  INFO: log_reporter.cpp report 36]>>SessionStage.writesocket:mean:0,tps:0
