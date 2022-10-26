@@ -42,19 +42,24 @@ typedef enum {
 } CompOp;
 
 //属性值类型
-typedef enum
-{
-  UNDEFINED,
-  CHARS,
-  INTS,
-  FLOATS
-} AttrType;
+typedef enum { UNDEFINED, CHARS, INTS, FLOATS } AttrType;
+
+//聚合函数类型
+typedef enum { INVALID, MAX, MIN, SUM, AVG, COUNT } AggrType;
 
 //属性值
 typedef struct _Value {
   AttrType type;  // type of value
   void *data;     // value
 } Value;
+
+// 聚合属性结构体 avg(i): {AVG, 1, null, {"t", 'i'}} count(1): {COUNT, 0, {INTS, 1}, null}
+typedef struct {
+  AggrType aggr_type;  // 聚合类型
+  int is_attr;         // 是否为属性
+  Value value;         // 参数值
+  RelAttr attr;        // 属性结构体
+} AggrAttr;
 
 typedef struct _Condition {
   int left_is_attr;    // TRUE if left-hand side is an attribute
@@ -70,12 +75,14 @@ typedef struct _Condition {
 
 // struct of select
 typedef struct {
-  size_t attr_num;                // Length of attrs in Select clause
-  RelAttr attributes[MAX_NUM];    // attrs in Select clause
-  size_t relation_num;            // Length of relations in Fro clause
-  char *relations[MAX_NUM];       // relations in From clause
-  size_t condition_num;           // Length of conditions in Where clause
-  Condition conditions[MAX_NUM];  // conditions in Where clause
+  size_t aggr_num;                    // Length of aggr attrs in Select clause
+  AggrAttr aggr_attributes[MAX_NUM];  // Aggr attrs in Select clause
+  size_t attr_num;                    // Length of attrs in Select clause
+  RelAttr attributes[MAX_NUM];        // attrs in Select clause
+  size_t relation_num;                // Length of relations in Fro clause
+  char *relations[MAX_NUM];           // relations in From clause
+  size_t condition_num;               // Length of conditions in Where clause
+  Condition conditions[MAX_NUM];      // conditions in Where clause
 } Selects;
 
 // struct of insert
@@ -196,6 +203,10 @@ extern "C" {
 void relation_attr_init(RelAttr *relation_attr, const char *relation_name, const char *attribute_name);
 void relation_attr_destroy(RelAttr *relation_attr);
 
+void relation_aggr_init(AggrAttr *aggr_attr, AggrType aggr_Type, int is_attr, const char *relation_name,
+    const char *attribute_name, Value *value);
+void relation_aggr_destroy(AggrAttr *aggr_attr);
+
 void value_init_integer(Value *value, int v);
 void value_init_float(Value *value, float v);
 void value_init_string(Value *value, const char *v);
@@ -210,6 +221,7 @@ void attr_info_destroy(AttrInfo *attr_info);
 
 void selects_init(Selects *selects, ...);
 void selects_append_attribute(Selects *selects, RelAttr *rel_attr);
+void selects_append_aggr(Selects *selects, AggrAttr *aggr_attr);
 void selects_append_relation(Selects *selects, const char *relation_name);
 void selects_append_conditions(Selects *selects, Condition conditions[], size_t condition_num);
 void selects_destroy(Selects *selects);

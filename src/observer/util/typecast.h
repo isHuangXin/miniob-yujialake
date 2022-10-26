@@ -3,5 +3,5 @@
 //
 #pragma once
 
-int chars_to_ints(char*);
-float chars_to_floats(char*);
+int chars_to_ints(const char*);
+float chars_to_floats(const char*);

@@ -19,7 +19,8 @@ typedef struct ParserContext {
   Value values[MAX_NUM];
   Condition conditions[MAX_NUM];
   CompOp comp;
-	char id[MAX_NUM];
+  AggrType aggr_t;
+  char id[MAX_NUM];
 } ParserContext;
 
 //获取子串
@@ -104,6 +105,12 @@ ParserContext *get_context(yyscan_t scanner)
         NE
 		NOT
 		LK
+		MAX_T
+		MIN_T
+		AVG_T
+		SUM_T
+		COUNT_T
+
 
 %union {
   struct _Attr *attr;
@@ -379,6 +386,9 @@ select_attr:
 			relation_attr_init(&attr, $1, $3);
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
 		}
+	| aggr_attr attr_list {
+
+	}
     ;
 attr_list:
     /* empty */
@@ -401,8 +411,52 @@ attr_list:
 			relation_attr_init(&attr, NULL, "*");
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
     }
-  	;
+	| COMMA aggr_attr attr_list{
 
+	}
+  	;
+aggr_attr:
+	 aggr_type LBRACE ID extra_attr RBRACE {
+		AggrAttr attr;
+		relation_aggr_init(&attr, CONTEXT->aggr_t, 1, NULL, $3, NULL);
+		selects_append_aggr(&CONTEXT->ssql->sstr.selection, &attr);
+	  }
+	| aggr_type LBRACE ID DOT ID extra_attr RBRACE {
+		AggrAttr attr;
+		relation_aggr_init(&attr, CONTEXT->aggr_t, 1, $3, $5, NULL);
+		selects_append_aggr(&CONTEXT->ssql->sstr.selection, &attr);
+	  }
+	| aggr_type LBRACE RBRACE {
+		AggrAttr attr;
+		relation_aggr_init(&attr, INVALID, 0, NULL, NULL, NULL);
+		selects_append_aggr(&CONTEXT->ssql->sstr.selection, &attr);
+	  }
+	| aggr_type LBRACE STAR extra_attr RBRACE {
+		AggrAttr attr;
+		relation_aggr_init(&attr, CONTEXT->aggr_t == COUNT ? COUNT : INVALID, 1, NULL, "*", NULL);
+		selects_append_aggr(&CONTEXT->ssql->sstr.selection, &attr);
+	  } 
+	| aggr_type LBRACE value extra_attr RBRACE {
+		AggrAttr attr;
+		Value *value = &CONTEXT->values[CONTEXT->value_length - 1];
+		relation_aggr_init(&attr, CONTEXT->aggr_t, 0, NULL, NULL, value);
+		selects_append_aggr(&CONTEXT->ssql->sstr.selection, &attr);
+	}
+	;
+aggr_type:
+	  MAX_T { CONTEXT->aggr_t = MAX; }
+	| MIN_T { CONTEXT->aggr_t = MIN; }
+	| AVG_T { CONTEXT->aggr_t = AVG; }
+	| SUM_T { CONTEXT->aggr_t = SUM; }
+	| COUNT_T { CONTEXT->aggr_t = COUNT; }
+	;
+extra_attr:
+    /* empty */
+	| COMMA ID extra_attr { CONTEXT->aggr_t = INVALID; }
+	| COMMA ID DOT ID extra_attr { CONTEXT->aggr_t = INVALID; }
+	| COMMA STAR extra_attr { CONTEXT->aggr_t = INVALID; }
+	| COMMA value extra_attr { CONTEXT->aggr_t = INVALID; }
+	;
 rel_list:
     /* empty */
     | COMMA ID rel_list {	

@@ -4,7 +4,7 @@
 #include <string.h>
 #include <cstdlib>
 #include <math.h>
-int chars_to_ints(char* source)
+int chars_to_ints(const char* source)
 {
   // int len = strlen(source);
   // int res = 0;
@@ -38,7 +38,7 @@ int chars_to_ints(char* source)
   // return res * (1 - 2 * flag);
 }
 
-float chars_to_floats(char* source)
+float chars_to_floats(const char* source)
 {
   // int len = strlen(source);
   // int flag = source[0] == '-';

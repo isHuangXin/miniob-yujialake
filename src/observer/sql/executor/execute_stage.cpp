@@ -27,6 +27,7 @@ See the Mulan PSL v2 for more details. */
 #include "event/sql_event.h"
 #include "event/session_event.h"
 #include "sql/expr/tuple.h"
+#include "sql/operator/aggr_operator.h"
 #include "sql/operator/join_operator.h"
 #include "sql/operator/table_scan_operator.h"
 #include "sql/operator/index_scan_operator.h"
@@ -427,12 +428,17 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 
   PredicateOperator pred_oper(select_stmt->filter_stmt());
   pred_oper.add_child(scan_oper);
+  AggrOperator aggr_oper(select_stmt->aggr_fields());
+  aggr_oper.add_child(&pred_oper);
   ProjectOperator project_oper;
-  project_oper.add_child(&pred_oper);
+  project_oper.add_child(&aggr_oper);
 
   bool is_multi_mode = tables.size() >= 2;
   for (const Field &field : select_stmt->query_fields()) {
-    project_oper.add_projection(field.table(), field.meta(), is_multi_mode);
+    project_oper.add_projection(field, is_multi_mode);
+  }
+  for (const Field &field : select_stmt->aggr_fields()) {
+    project_oper.add_projection(field, is_multi_mode);
   }
   rc = project_oper.open();
   if (rc != RC::SUCCESS) {

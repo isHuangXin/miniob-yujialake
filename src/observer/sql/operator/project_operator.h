@@ -17,15 +17,14 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/operator.h"
 #include "rc.h"
 
-class ProjectOperator : public Operator
-{
+class ProjectOperator : public Operator {
 public:
   ProjectOperator()
   {}
 
   virtual ~ProjectOperator() = default;
 
-  void add_projection(const Table *table, const FieldMeta *field, bool is_multi_mode);
+  void add_projection(const Field &field, bool is_multi_mode);
 
   RC open() override;
   RC next() override;
@@ -38,7 +37,8 @@ public:
 
   RC tuple_cell_spec_at(int index, const TupleCellSpec *&spec) const;
 
-  Tuple * current_tuple() override;
+  Tuple *current_tuple() override;
+
 private:
   ProjectTuple tuple_;
 };

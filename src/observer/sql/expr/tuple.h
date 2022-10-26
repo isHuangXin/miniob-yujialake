@@ -172,6 +172,75 @@ private:
 };
 */
 
+class AggrTuple : public Tuple {
+public:
+  AggrTuple() = default;
+  virtual ~AggrTuple()
+  {
+    for (TupleCellSpec *spec : speces_) {
+      delete spec;
+    }
+    speces_.clear();
+  }
+
+  void set_tuple(Tuple *tuple)
+  {
+    this->tuple_ = tuple;
+  }
+
+  void add_cell_spec(TupleCellSpec *spec)
+  {
+    speces_.push_back(spec);
+  }
+
+  void add_cell(TupleCell &cell)
+  {
+    cells_.push_back(cell);
+  }
+
+  int cell_num() const override
+  {
+    return speces_.size();
+  }
+
+  RC cell_at(int index, TupleCell &cell) const override
+  {
+    if (index < 0 || index >= static_cast<int>(speces_.size())) {
+      return RC::GENERIC_ERROR;
+    }
+    if (tuple_ == nullptr) {
+      return RC::GENERIC_ERROR;
+    }
+
+    cell = cells_[index];
+    return RC::SUCCESS;
+  }
+
+  TupleCell &cell_at(int index)
+  {
+    return cells_[index];
+  }
+
+  RC find_cell(const Field &field, TupleCell &cell) const override
+  {
+    return tuple_->find_cell(field, cell);
+  }
+
+  RC cell_spec_at(int index, const TupleCellSpec *&spec) const override
+  {
+    if (index < 0 || index >= static_cast<int>(speces_.size())) {
+      return RC::NOTFOUND;
+    }
+    spec = speces_[index];
+    return RC::SUCCESS;
+  }
+
+private:
+  Tuple *tuple_ = nullptr;
+  std::vector<TupleCellSpec *> speces_;
+  std::vector<TupleCell> cells_;
+};
+
 class ProjectTuple : public Tuple {
 public:
   ProjectTuple() = default;
@@ -204,6 +273,10 @@ public:
     }
     if (tuple_ == nullptr) {
       return RC::GENERIC_ERROR;
+    }
+
+    if (dynamic_cast<AggrTuple *>(tuple_)) {
+      return tuple_->cell_at(index, cell);
     }
 
     const TupleCellSpec *spec = speces_[index];
@@ -273,7 +346,7 @@ public:
       LOG_WARN("invalid argument. index=%d", index);
       return RC::INVALID_ARGUMENT;
     }
-    
+
     Tuple *tuple = index < left_->cell_num() ? left_ : right_;
     if (index >= left_->cell_num()) {
       index = index - left_->cell_num();

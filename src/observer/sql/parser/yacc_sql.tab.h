@@ -97,13 +97,18 @@ extern int yydebug;
     NE = 298,                      /* NE  */
     NOT = 299,                     /* NOT  */
     LK = 300,                      /* LK  */
-    NUMBER = 301,                  /* NUMBER  */
-    FLOAT = 302,                   /* FLOAT  */
-    ID = 303,                      /* ID  */
-    PATH = 304,                    /* PATH  */
-    SSS = 305,                     /* SSS  */
-    STAR = 306,                    /* STAR  */
-    STRING_V = 307                 /* STRING_V  */
+    MAX_T = 301,                   /* MAX_T  */
+    MIN_T = 302,                   /* MIN_T  */
+    AVG_T = 303,                   /* AVG_T  */
+    SUM_T = 304,                   /* SUM_T  */
+    COUNT_T = 305,                 /* COUNT_T  */
+    NUMBER = 306,                  /* NUMBER  */
+    FLOAT = 307,                   /* FLOAT  */
+    ID = 308,                      /* ID  */
+    PATH = 309,                    /* PATH  */
+    SSS = 310,                     /* SSS  */
+    STAR = 311,                    /* STAR  */
+    STRING_V = 312                 /* STRING_V  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -112,7 +117,7 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 108 "yacc_sql.y"
+#line 115 "yacc_sql.y"
 
   struct _Attr *attr;
   struct _Condition *condition1;
@@ -122,7 +127,7 @@ union YYSTYPE
   float floats;
 	char *position;
 
-#line 126 "yacc_sql.tab.h"
+#line 131 "yacc_sql.tab.h"
 
 };
 typedef union YYSTYPE YYSTYPE;

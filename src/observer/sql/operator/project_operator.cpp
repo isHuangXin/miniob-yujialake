@@ -50,19 +50,54 @@ Tuple *ProjectOperator::current_tuple()
   return &tuple_;
 }
 
-void ProjectOperator::add_projection(const Table *table, const FieldMeta *field_meta, bool is_multi_mode = false)
+const char *get_func_name(AggrType type)
+{
+  switch (type) {
+    case MAX:
+      return "max";
+    case MIN:
+      return "min";
+    case AVG:
+      return "avg";
+    case SUM:
+      return "sum";
+    case COUNT:
+      return "count";
+    default:
+      return "unknown";
+  }
+}
+
+void ProjectOperator::add_projection(const Field &field, bool is_multi_mode = false)
 {
   // 对单表来说，展示的(alias) 字段总是字段名称，
   // 对多表查询来说，展示的alias 需要带表名字
+  const Table *table = field.table();
+  const FieldMeta *field_meta = field.meta();
+  bool is_aggr = field.aggr_type() != INVALID;
+  const char *func_name = is_aggr ? get_func_name(field.aggr_type()) : "";
   TupleCellSpec *spec = new TupleCellSpec(new FieldExpr(table, field_meta));
+  const char *field_name = field.aggr_param().empty() ? field_meta->name() : field.aggr_param().c_str();
   if (is_multi_mode) {
     const char *table_name = table->name();
-    const char *field_name = field_meta->name();
-    char *name = (char *)malloc(strlen(table_name) + strlen(field_name) + 1);
-    sprintf(name, "%s.%s", table_name, field_name);
-    spec->set_alias(name);
+    char *alias;
+    if (is_aggr) {
+      alias = (char *)malloc(strlen(func_name) + 2 + strlen(table_name) + strlen(field_name) + 1);
+      sprintf(alias, "%s(%s.%s)", func_name, table_name, field_name);
+    } else {
+      alias = (char *)malloc(strlen(table_name) + strlen(field_name) + 1);
+      sprintf(alias, "%s.%s", table_name, field_name);
+    }
+    spec->set_alias(alias);
   } else {
-    spec->set_alias(field_meta->name());
+    char *alias;
+    if (is_aggr) {
+      alias = (char *)malloc(strlen(func_name) + 2 + strlen(field_name) + 1);
+      sprintf(alias, "%s(%s)", func_name, field_name);
+    } else {
+      alias = const_cast<char *>(field_name);
+    }
+    spec->set_alias(alias);
   }
   tuple_.add_cell_spec(spec);
 }

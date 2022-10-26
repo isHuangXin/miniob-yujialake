@@ -43,6 +43,11 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
     return RC::INVALID_ARGUMENT;
   }
 
+  // 不支持聚合函数和普通字段同时查询
+  if (select_sql.attr_num > 0 && select_sql.aggr_num > 0) {
+    return RC::INVALID_ARGUMENT;
+  }
+
   // collect tables in `from` statement
   std::vector<Table *> tables;
   std::unordered_map<std::string, Table *> table_map;
@@ -60,9 +65,9 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
     }
 
     tables.push_back(table);
-    table_map.insert(std::pair<std::string, Table*>(table_name, table));
+    table_map.insert(std::pair<std::string, Table *>(table_name, table));
   }
-  
+
   // collect query fields in `select` statement
   std::vector<Field> query_fields;
   for (int i = select_sql.attr_num - 1; i >= 0; i--) {
@@ -73,7 +78,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
         wildcard_fields(table, query_fields);
       }
 
-    } else if (!common::is_blank(relation_attr.relation_name)) { // TODO
+    } else if (!common::is_blank(relation_attr.relation_name)) {  // TODO
       const char *table_name = relation_attr.relation_name;
       const char *field_name = relation_attr.attribute_name;
 
@@ -102,7 +107,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
             return RC::SCHEMA_FIELD_MISSING;
           }
 
-        query_fields.push_back(Field(table, field_meta));
+          query_fields.push_back(Field(table, field_meta));
         }
       }
     } else {
@@ -122,6 +127,68 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
     }
   }
 
+  // 收集聚合字段
+  std::vector<Field> aggr_fields;
+  for (size_t i = 0; i < select_sql.aggr_num; i++) {
+    const AggrAttr &aggr_attr = select_sql.aggr_attributes[i];
+    if (aggr_attr.aggr_type == INVALID) {
+      return RC::INVALID_ARGUMENT;
+    }
+
+    Field f;
+    f.set_aggr_type(aggr_attr.aggr_type);
+    // COUNT(*)
+    if (aggr_attr.aggr_type == COUNT && aggr_attr.is_attr && 0 == strcmp(aggr_attr.attr.attribute_name, "*")) {
+      f.set_aggr_param("*");
+    }
+    // COUNT(id)
+    else if (aggr_attr.is_attr) {
+      const char *field_name = aggr_attr.attr.attribute_name;
+      const char *table_name = aggr_attr.attr.relation_name;
+      Table *table = nullptr;
+      if (common::is_blank(table_name)) {
+        table = tables[0];
+      } else {
+        auto iter = table_map.find(table_name);
+        if (iter == table_map.end()) {
+          LOG_WARN("no such table in from list: %s", table_name);
+          return RC::SCHEMA_FIELD_MISSING;
+        }
+      }
+
+      const FieldMeta *field_meta = table->table_meta().field(field_name);
+      if (nullptr == field_meta) {
+        LOG_WARN("no such field. field=%s.%s.%s", db->name(), table->name(), field_name);
+        return RC::SCHEMA_FIELD_MISSING;
+      }
+
+      f.set_table(table);
+      f.set_field(field_meta);
+      // COUNT(1)
+    } else {
+      switch (aggr_attr.value.type) {
+        case INTS:
+          f.set_aggr_param(std::to_string(*(int *)aggr_attr.value.data));
+          break;
+        case CHARS:
+          f.set_aggr_param(std::string((const char *)aggr_attr.value.data));
+          break;
+        case FLOATS: {
+          std::string s = std::to_string(*(float *)aggr_attr.value.data);
+          while (s.back() == '0' || s.back() == '.') {
+            s.pop_back();
+          }
+          f.set_aggr_param(std::move(s));
+          break;
+        }
+        default:
+          return RC::INTERNAL;
+      }
+    }
+
+    aggr_fields.push_back(f);
+  }
+
   LOG_INFO("got %d tables in from stmt and %d fields in query stmt", tables.size(), query_fields.size());
 
   Table *default_table = nullptr;
@@ -131,8 +198,8 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
 
   // create filter statement in `where` statement
   FilterStmt *filter_stmt = nullptr;
-  RC rc = FilterStmt::create(db, default_table, &table_map,
-           select_sql.conditions, select_sql.condition_num, filter_stmt);
+  RC rc =
+      FilterStmt::create(db, default_table, &table_map, select_sql.conditions, select_sql.condition_num, filter_stmt);
   if (rc != RC::SUCCESS) {
     LOG_WARN("cannot construct filter stmt");
     return rc;
@@ -142,6 +209,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
   SelectStmt *select_stmt = new SelectStmt();
   select_stmt->tables_.swap(tables);
   select_stmt->query_fields_.swap(query_fields);
+  select_stmt->aggr_fields_.swap(aggr_fields);
   select_stmt->filter_stmt_ = filter_stmt;
   stmt = select_stmt;
   return RC::SUCCESS;

@@ -9,7 +9,7 @@ MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 See the Mulan PSL v2 for more details. */
 
 //
-// Created by Meiyi 
+// Created by Meiyi
 //
 
 #include <mutex>
@@ -38,6 +38,34 @@ void relation_attr_destroy(RelAttr *relation_attr)
   free(relation_attr->attribute_name);
   relation_attr->relation_name = nullptr;
   relation_attr->attribute_name = nullptr;
+}
+
+void relation_aggr_init(AggrAttr *aggr_attr, AggrType aggr_Type, int is_attr, const char *relation_name,
+    const char *attribute_name, Value *value)
+{
+  aggr_attr->aggr_type = aggr_Type;
+  aggr_attr->is_attr = is_attr;
+  if (is_attr == 1) {
+    if (relation_name != nullptr) {
+      aggr_attr->attr.relation_name = strdup(relation_name);
+    } else {
+      aggr_attr->attr.relation_name = nullptr;
+    }
+    aggr_attr->attr.attribute_name = strdup(attribute_name);
+  } else {
+    if (value)
+      aggr_attr->value = *value;
+  }
+}
+
+void relation_aggr_destroy(AggrAttr *aggr_attr)
+{
+  if (aggr_attr->is_attr) {
+    free(aggr_attr->attr.relation_name);
+    free(aggr_attr->attr.attribute_name);
+  }
+  aggr_attr->attr.relation_name = nullptr;
+  aggr_attr->attr.attribute_name = nullptr;
 }
 
 void value_init_integer(Value *value, int v)
@@ -113,6 +141,12 @@ void selects_append_attribute(Selects *selects, RelAttr *rel_attr)
 {
   selects->attributes[selects->attr_num++] = *rel_attr;
 }
+
+void selects_append_aggr(Selects *selects, AggrAttr *aggr_attr)
+{
+  selects->aggr_attributes[selects->aggr_num++] = *aggr_attr;
+}
+
 void selects_append_relation(Selects *selects, const char *relation_name)
 {
   selects->relations[selects->relation_num++] = strdup(relation_name);
@@ -142,6 +176,11 @@ void selects_destroy(Selects *selects)
 
   for (size_t i = 0; i < selects->condition_num; i++) {
     condition_destroy(&selects->conditions[i]);
+  }
+  selects->condition_num = 0;
+
+  for (size_t i = 0; i < selects->aggr_num; i++) {
+    relation_aggr_destroy(&selects->aggr_attributes[i]);
   }
   selects->condition_num = 0;
 }
@@ -290,7 +329,6 @@ void show_index_destroy(ShowIndex *show_index)
   free(show_index->relation_name);
   show_index->relation_name = nullptr;
 }
-
 
 void desc_table_init(DescTable *desc_table, const char *relation_name)
 {

@@ -17,23 +17,54 @@ See the Mulan PSL v2 for more details. */
 #include "storage/common/table.h"
 #include "storage/common/field_meta.h"
 
-class Field
-{
+class Field {
 public:
   Field() = default;
-  Field(const Table *table, const FieldMeta *field) : table_(table), field_(field)
+  Field(const Table *table, const FieldMeta *field) : table_(table), field_(field), aggr_type_(INVALID)
   {}
 
-  const Table *table() const { return table_; }
-  const FieldMeta *meta() const { return field_; }
+  const Table *table() const
+  {
+    return table_;
+  }
+  const FieldMeta *meta() const
+  {
+    return field_;
+  }
 
   AttrType attr_type() const
   {
     return field_->type();
   }
 
-  const char *table_name() const { return table_->name(); }
-  const char *field_name() const { return field_->name(); }
+  AggrType aggr_type() const
+  {
+    return aggr_type_;
+  }
+
+  void set_aggr_type(AggrType type)
+  {
+    this->aggr_type_ = type;
+  }
+
+  const std::string &aggr_param() const
+  {
+    return aggr_param_;
+  }
+
+  void set_aggr_param(std::string param)
+  {
+    this->aggr_param_ = param;
+  }
+
+  const char *table_name() const
+  {
+    return table_->name();
+  }
+  const char *field_name() const
+  {
+    return field_->name();
+  }
 
   void set_table(const Table *table)
   {
@@ -43,7 +74,10 @@ public:
   {
     this->field_ = field;
   }
+
 private:
   const Table *table_ = nullptr;
   const FieldMeta *field_ = nullptr;
+  AggrType aggr_type_;
+  std::string aggr_param_;
 };
