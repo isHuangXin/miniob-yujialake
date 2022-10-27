@@ -15,7 +15,9 @@ See the Mulan PSL v2 for more details. */
 #include <stddef.h>
 #include <math.h>
 #include "condition_filter.h"
+#include "sql/parser/parse_defs.h"
 #include "storage/record/record_manager.h"
+#include "sql/stmt/stmt.h"
 #include "common/log/log.h"
 #include "storage/common/table.h"
 
@@ -58,6 +60,19 @@ RC DefaultConditionFilter::init(const ConDesc &left, const ConDesc &right, AttrT
   return RC::SUCCESS;
 }
 
+
+bool field_type_compare_compatible(AttrType type1, AttrType type2)
+{
+  if (type1 == type2) {
+    return true;
+  }
+  if ((type1 == INTS && type2 == FLOATS) ||
+      (type1 == FLOATS && type2 == INTS)) {
+    return true;
+  }
+  return false;
+}
+
 RC DefaultConditionFilter::init(Table &table, const Condition &condition)
 {
   const TableMeta &table_meta = table.table_meta();
@@ -85,6 +100,10 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition)
     left.value = condition.left_value.data;  // 校验type 或者转换类型
     type_left = condition.left_value.type;
 
+    if (type_left == DATES && *(int*)left.value == -1) {
+      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+    }
+
     left.attr_length = 0;
     left.attr_offset = 0;
   }
@@ -106,6 +125,10 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition)
     right.value = condition.right_value.data;
     type_right = condition.right_value.type;
 
+    if (type_right == DATES && *(int*)right.value == -1) {
+      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+    }
+
     right.attr_length = 0;
     right.attr_offset = 0;
   }
@@ -117,7 +140,10 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition)
   //  }
   // NOTE：这里没有实现不同类型的数据比较，比如整数跟浮点数之间的对比
   // 但是选手们还是要实现。这个功能在预选赛中会出现
-  if (type_left != type_right) {
+  // if (type_left != type_right) {
+  //  return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+  //}
+  if (!Stmt::check_type(type_left, type_right)) {
     return RC::SCHEMA_FIELD_TYPE_MISMATCH;
   }
 
@@ -159,6 +185,11 @@ bool DefaultConditionFilter::filter(const Record &rec) const
       float right = *(float *)right_value;
       float result = left - right;
       cmp_result = result >= 0 ? ceil(result) : floor(result);
+    } break;
+    case DATES: {
+      int left = *(int *)left_value;
+      int right = *(int *)right_value;
+      cmp_result = left - right;
     } break;
     default: {
     }

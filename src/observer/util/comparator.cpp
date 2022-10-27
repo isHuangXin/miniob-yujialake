@@ -81,3 +81,10 @@ bool match_string(const char *lhs, const char *rhs)
   }
   return dp[m][n];
 }
+
+int compare_date(void *arg1, void *arg2)
+{
+  int v1 = *(int *)arg1;
+  int v2 = *(int *)arg2;
+  return v1 - v2;
+}

@@ -45,4 +45,13 @@ RC Stmt::create_stmt(Db *db, const Query &query, Stmt *&stmt)
   return RC::UNIMPLENMENT;
 }
 
-
+bool Stmt::check_type(AttrType t1, AttrType t2)
+{
+  if (t1 == AttrType::DATES && t2 != AttrType::DATES && t2 != AttrType::NULLS) {
+    return false;
+  }
+  if (t1 != AttrType::DATES && t2 == AttrType::DATES && t1 != AttrType::NULLS) {
+    return false;
+  }
+  return true;
+}

@@ -53,7 +53,8 @@ public:
 
 public:
   static RC create_stmt(Db *db, const Query &query, Stmt *&stmt);
-
+  static bool check_type(AttrType t1, AttrType t2);
+  
 private:
 };
 

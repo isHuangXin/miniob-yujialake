@@ -24,6 +24,7 @@ See the Mulan PSL v2 for more details. */
 #include "storage/record/record_manager.h"
 #include "storage/default/disk_buffer_pool.h"
 #include "sql/parser/parse_defs.h"
+#include "util/util.h"
 #include "util/comparator.h"
 
 #define EMPTY_RID_PAGE_NUM -1
@@ -46,14 +47,16 @@ public:
     switch (attr_type_) {
     case INTS: {
       return compare_int((void *)v1, (void *)v2);
-    }
-      break;
+    } break;
     case FLOATS: {
       return compare_float((void *)v1, (void *)v2);
-    }
+    } break;
     case CHARS: {
       return compare_string((void *)v1, attr_length_, (void *)v2, attr_length_);
-    }
+    } break;
+    case DATES: {
+      return compare_date((void *)v1, (void *)v2);
+    } break;
     default:{
       LOG_ERROR("unknown attr type. %d", attr_type_);
       abort();
@@ -109,21 +112,23 @@ public:
     switch (attr_type_) {
     case INTS: {
       return std::to_string(*(int*)v);
-    }
-      break;
+    } break;
     case FLOATS: {
       return std::to_string(*(float*)v);
-    }
+    } break;
     case CHARS: {
       std::string str;
       for (int i = 0; i < attr_length_; i++) {
-	if (v[i] == 0) {
-	  break;
-	}
-	str.push_back(v[i]);
+	      if (v[i] == 0) {
+	        break;
+	      }
+	      str.push_back(v[i]);
       }
       return str;
-    }
+    } break;
+    case DATES: {
+      return date_to_string(*(int*)v);
+    } break;
     default:{
       LOG_ERROR("unknown attr type. %d", attr_type_);
       abort();
