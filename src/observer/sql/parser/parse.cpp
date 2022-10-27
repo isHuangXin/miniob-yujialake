@@ -9,7 +9,7 @@ MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 See the Mulan PSL v2 for more details. */
 
 //
-// Created by Meiyi 
+// Created by Meiyi
 //
 
 #include <mutex>
@@ -82,6 +82,7 @@ void condition_init(Condition *condition, CompOp comp, int left_is_attr, RelAttr
     condition->right_value = *right_value;
   }
 }
+
 void condition_destroy(Condition *condition)
 {
   if (condition->left_is_attr) {
@@ -118,6 +119,12 @@ void selects_append_relation(Selects *selects, const char *relation_name)
   selects->relations[selects->relation_num++] = strdup(relation_name);
 }
 
+void selects_append_join_relation(Selects *selects, const char *relation_name)
+{
+  selects->relations[selects->relation_num++] = strdup(relation_name);
+  selects->join_num++;
+}
+
 void selects_append_conditions(Selects *selects, Condition conditions[], size_t condition_num)
 {
   assert(condition_num <= sizeof(selects->conditions) / sizeof(selects->conditions[0]));
@@ -125,6 +132,15 @@ void selects_append_conditions(Selects *selects, Condition conditions[], size_t 
     selects->conditions[i] = conditions[i];
   }
   selects->condition_num = condition_num;
+}
+
+void selects_append_join_conditions(Selects *selects, Condition conditions[], size_t condition_num)
+{
+  assert(condition_num <= sizeof(selects->join_conditions[selects->join_num - 1]) / sizeof(selects->conditions[0]));
+  for (size_t i = 0; i < condition_num; i++) {
+    selects->join_conditions[selects->join_num - 1][i] = conditions[i];
+  }
+  selects->join_condition_num[selects->join_num - 1] = condition_num;
 }
 
 void selects_destroy(Selects *selects)
@@ -144,6 +160,14 @@ void selects_destroy(Selects *selects)
     condition_destroy(&selects->conditions[i]);
   }
   selects->condition_num = 0;
+
+  for (size_t i = 0; i < selects->join_num; i++) {
+    for (size_t j = 0; j < selects->join_condition_num[i]; j++) {
+      condition_destroy(&selects->join_conditions[i][j]);
+    }
+    selects->join_condition_num[i] = 0;
+  }
+  selects->join_num = 0;
 }
 
 void inserts_init(Inserts *inserts, const char *relation_name, Value values[], size_t value_num)
@@ -290,7 +314,6 @@ void show_index_destroy(ShowIndex *show_index)
   free(show_index->relation_name);
   show_index->relation_name = nullptr;
 }
-
 
 void desc_table_init(DescTable *desc_table, const char *relation_name)
 {

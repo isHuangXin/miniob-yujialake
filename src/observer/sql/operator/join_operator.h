@@ -14,14 +14,17 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
+#include "sql/expr/tuple.h"
 #include "sql/parser/parse.h"
 #include "sql/operator/operator.h"
 #include "rc.h"
+#include "sql/stmt/filter_stmt.h"
 
 // TODO fixme
 class JoinOperator : public Operator {
 public:
-  JoinOperator(Operator *left, Operator *right) : left_(left), right_(right)
+  JoinOperator(Operator *left, Operator *right, FilterStmt *filter = nullptr)
+      : left_(left), right_(right), filter_(filter)
   {}
 
   virtual ~JoinOperator()
@@ -40,7 +43,11 @@ public:
   Tuple *current_tuple() override;
 
 private:
+  RC next_internal();
+  bool do_predicate(JoinTuple &tuple);
+  JoinTuple *tuple_ = nullptr;
   Operator *left_ = nullptr;
   Operator *right_ = nullptr;
-  bool round_done_ = true;
+  FilterStmt *filter_ = nullptr;
+  bool round_done_ = false;
 };

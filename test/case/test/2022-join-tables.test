@@ -1,0 +1,19 @@
+
+
+create table s1(id int, age float, addr char(4));
+create table s2(id int, age float, addr char(4));
+create table s3(id int, age float, addr char(4));
+insert into s1 values (1,3,'434');
+insert into s2 values (2,6,'aa');
+insert into s2 values (1,-1.9,'aa');
+insert into s3 values (3,9,'zz');
+insert into s3 values (2,1,'zz');
+insert into s3 values ('1',7,'zz');
+select * from s1,s2,s3;
+select * from s1 inner join s2 on s1.id<=s2.id and s1.age> s2.age;
+select s1.id, s2.id,s3.id from s1 inner join s2 on s1.id=s2.id inner join s3 on s1.id=s3.id;
+select * from s1 inner join s3 on s1.id=s3.id, s2 inner join s3 on s2.id=s3.id;
+select * from s1,s2,s3;
+drop table s1;
+drop table s2;
+drop table s3;

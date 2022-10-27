@@ -42,13 +42,7 @@ typedef enum {
 } CompOp;
 
 //属性值类型
-typedef enum
-{
-  UNDEFINED,
-  CHARS,
-  INTS,
-  FLOATS
-} AttrType;
+typedef enum { UNDEFINED, CHARS, INTS, FLOATS } AttrType;
 
 //属性值
 typedef struct _Value {
@@ -70,12 +64,15 @@ typedef struct _Condition {
 
 // struct of select
 typedef struct {
-  size_t attr_num;                // Length of attrs in Select clause
-  RelAttr attributes[MAX_NUM];    // attrs in Select clause
-  size_t relation_num;            // Length of relations in Fro clause
-  char *relations[MAX_NUM];       // relations in From clause
-  size_t condition_num;           // Length of conditions in Where clause
-  Condition conditions[MAX_NUM];  // conditions in Where clause
+  size_t attr_num;                              // Length of attrs in Select clause
+  RelAttr attributes[MAX_NUM];                  // attrs in Select clause
+  size_t relation_num;                          // Length of relations in Fro clause
+  char *relations[MAX_NUM];                     // relations in From clause
+  size_t condition_num;                         // Length of conditions in Where clause
+  Condition conditions[MAX_NUM];                // conditions in Where clause
+  size_t join_num;                              // Length of inner join
+  size_t join_condition_num[MAX_NUM];           // Length of conditions in inner join clause
+  Condition join_conditions[MAX_NUM][MAX_NUM];  // conditions in join clause
 } Selects;
 
 // struct of insert

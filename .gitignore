@@ -24,4 +24,6 @@ miniob/*
 *.data
 *.table
 clog
+*.tmp
+result_tmp
 #*#
