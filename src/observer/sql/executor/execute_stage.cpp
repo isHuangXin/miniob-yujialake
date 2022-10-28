@@ -422,8 +422,10 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     scan_oper = new TableScanOperator(tables.front());
   }
 
+  const std::vector<FilterStmt *> join_filters = select_stmt->join_filters();
   for (int i = 1; i < tables.size(); i++) {
-    scan_oper = new JoinOperator(scan_oper, new TableScanOperator(tables[i]));
+    FilterStmt *join_filter = i - 1 < join_filters.size() ? join_filters[i - 1] : nullptr;
+    scan_oper = new JoinOperator(scan_oper, new TableScanOperator(tables[i]), join_filter);
   }
 
   PredicateOperator pred_oper(select_stmt->filter_stmt());

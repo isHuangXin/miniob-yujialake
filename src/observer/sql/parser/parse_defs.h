@@ -75,14 +75,17 @@ typedef struct _Condition {
 
 // struct of select
 typedef struct {
-  size_t aggr_num;                    // Length of aggr attrs in Select clause
-  AggrAttr aggr_attributes[MAX_NUM];  // Aggr attrs in Select clause
-  size_t attr_num;                    // Length of attrs in Select clause
-  RelAttr attributes[MAX_NUM];        // attrs in Select clause
-  size_t relation_num;                // Length of relations in Fro clause
-  char *relations[MAX_NUM];           // relations in From clause
-  size_t condition_num;               // Length of conditions in Where clause
-  Condition conditions[MAX_NUM];      // conditions in Where clause
+  size_t aggr_num;                              // Length of aggr attrs in Select clause
+  AggrAttr aggr_attributes[MAX_NUM];            // Aggr attrs in Select clause
+  size_t attr_num;                              // Length of attrs in Select clause
+  RelAttr attributes[MAX_NUM];                  // attrs in Select clause
+  size_t relation_num;                          // Length of relations in Fro clause
+  char *relations[MAX_NUM];                     // relations in From clause
+  size_t condition_num;                         // Length of conditions in Where clause
+  Condition conditions[MAX_NUM];                // conditions in Where clause
+  size_t join_num;                              // Length of inner join
+  size_t join_condition_num[MAX_NUM];           // Length of conditions in inner join clause
+  Condition join_conditions[MAX_NUM][MAX_NUM];  // conditions in join clause
 } Selects;
 
 // struct of insert
@@ -224,6 +227,9 @@ void selects_append_attribute(Selects *selects, RelAttr *rel_attr);
 void selects_append_aggr(Selects *selects, AggrAttr *aggr_attr);
 void selects_append_relation(Selects *selects, const char *relation_name);
 void selects_append_conditions(Selects *selects, Condition conditions[], size_t condition_num);
+void selects_arrange_relation(Selects *selects, const int join_num);
+void selects_append_join_relation(Selects *selects, const char *relation_name);
+void selects_append_join_conditions(Selects *selects, Condition conditions[], size_t condition_num);
 void selects_destroy(Selects *selects);
 
 void inserts_init(Inserts *inserts, const char *relation_name, Value values[], size_t value_num);

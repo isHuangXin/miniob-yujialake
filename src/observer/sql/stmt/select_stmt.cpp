@@ -18,6 +18,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/lang/string.h"
 #include "storage/common/db.h"
 #include "storage/common/table.h"
+#include <algorithm>
 
 SelectStmt::~SelectStmt()
 {
@@ -51,7 +52,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
   // collect tables in `from` statement
   std::vector<Table *> tables;
   std::unordered_map<std::string, Table *> table_map;
-  for (int i = select_sql.relation_num - 1; i >= 0; i--) {
+  for (int i = 0; i < select_sql.relation_num; i++) {
     const char *table_name = select_sql.relations[i];
     if (nullptr == table_name) {
       LOG_WARN("invalid argument. relation name is null. index=%d", i);
@@ -196,6 +197,19 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
     default_table = tables[0];
   }
 
+  // 为每个join建立一个filter statement
+  std::vector<FilterStmt *> join_filters;
+  for (size_t i = 0; i < select_sql.join_num; i++) {
+    FilterStmt *stmt = nullptr;
+    RC rc = FilterStmt::create(
+        db, default_table, &table_map, select_sql.join_conditions[i], select_sql.join_condition_num[i], stmt);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("cannot construct filter stmt");
+      return rc;
+    }
+    join_filters.push_back(stmt);
+  }
+
   // create filter statement in `where` statement
   FilterStmt *filter_stmt = nullptr;
   RC rc =
@@ -211,6 +225,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
   select_stmt->query_fields_.swap(query_fields);
   select_stmt->aggr_fields_.swap(aggr_fields);
   select_stmt->filter_stmt_ = filter_stmt;
+  select_stmt->join_filters_.swap(join_filters);
   stmt = select_stmt;
   return RC::SUCCESS;
 }

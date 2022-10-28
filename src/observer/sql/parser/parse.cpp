@@ -110,6 +110,7 @@ void condition_init(Condition *condition, CompOp comp, int left_is_attr, RelAttr
     condition->right_value = *right_value;
   }
 }
+
 void condition_destroy(Condition *condition)
 {
   if (condition->left_is_attr) {
@@ -152,6 +153,28 @@ void selects_append_relation(Selects *selects, const char *relation_name)
   selects->relations[selects->relation_num++] = strdup(relation_name);
 }
 
+void reverse_relations(Selects *selects, const int start, const int end)
+{
+  for (int i = start, j = end - 1; i < j; i++, j--) {
+    char *tmp = selects->relations[i];
+    selects->relations[i] = selects->relations[j];
+    selects->relations[j] = tmp;
+  }
+}
+
+void selects_arrange_relation(Selects *selects, const int join_num)
+{
+  int start = selects->relation_num - join_num - 1;
+  reverse_relations(selects, start, start + join_num);
+  reverse_relations(selects, start, selects->relation_num);
+}
+
+void selects_append_join_relation(Selects *selects, const char *relation_name)
+{
+  selects->relations[selects->relation_num++] = strdup(relation_name);
+  selects->join_num++;
+}
+
 void selects_append_conditions(Selects *selects, Condition conditions[], size_t condition_num)
 {
   assert(condition_num <= sizeof(selects->conditions) / sizeof(selects->conditions[0]));
@@ -159,6 +182,15 @@ void selects_append_conditions(Selects *selects, Condition conditions[], size_t 
     selects->conditions[i] = conditions[i];
   }
   selects->condition_num = condition_num;
+}
+
+void selects_append_join_conditions(Selects *selects, Condition conditions[], size_t condition_num)
+{
+  assert(condition_num <= sizeof(selects->join_conditions[selects->join_num - 1]) / sizeof(selects->conditions[0]));
+  for (size_t i = 0; i < condition_num; i++) {
+    selects->join_conditions[selects->join_num - 1][i] = conditions[i];
+  }
+  selects->join_condition_num[selects->join_num - 1] = condition_num;
 }
 
 void selects_destroy(Selects *selects)
@@ -182,7 +214,15 @@ void selects_destroy(Selects *selects)
   for (size_t i = 0; i < selects->aggr_num; i++) {
     relation_aggr_destroy(&selects->aggr_attributes[i]);
   }
-  selects->condition_num = 0;
+  selects->aggr_num = 0;
+
+  for (size_t i = 0; i < selects->join_num; i++) {
+    for (size_t j = 0; j < selects->join_condition_num[i]; j++) {
+      condition_destroy(&selects->join_conditions[i][j]);
+    }
+    selects->join_condition_num[i] = 0;
+  }
+  selects->join_num = 0;
 }
 
 void inserts_init(Inserts *inserts, const char *relation_name, Value values[], size_t value_num)

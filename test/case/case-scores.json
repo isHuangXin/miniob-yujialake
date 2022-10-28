@@ -17,5 +17,6 @@
   "primary-expression":{"necessary":false, "score":20},
   "primary-complex-sub-query":{"necessary":false, "score":20},
   "primary-order-by":{"necessary":false, "score":10},
-  "primary-group-by":{"necessary":false, "score":20}
+  "primary-group-by":{"necessary":false, "score":20},
+  "2022-join-tables":{"necessary":false, "score":37}
 }
