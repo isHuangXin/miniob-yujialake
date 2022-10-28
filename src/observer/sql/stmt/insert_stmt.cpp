@@ -54,6 +54,18 @@ RC InsertStmt::create(Db *db, const Inserts &inserts, Stmt *&stmt)
     const FieldMeta *field_meta = table_meta.field(i + sys_field_num);
     const AttrType field_type = field_meta->type();
     const AttrType value_type = values[i].type;
+
+    assert(!(value_type == AttrType::NULLS) ||
+          (((char *)values[i].data)[field_meta->len() - 1] == 1));
+
+    if (value_type == AttrType::NULLS && !field_meta->nullable()) {
+      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+    }
+
+    if (values[i].type == DATES && *(int*)values[i].data == -1) {
+      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+    }
+
     if (field_type != value_type) { // TODO try to convert the value type to field type
       // LOG_WARN("field type mismatch. table=%s, field=%s, field type=%d, value_type=%d", 
       //          table_name, field_meta->name(), field_type, value_type);
