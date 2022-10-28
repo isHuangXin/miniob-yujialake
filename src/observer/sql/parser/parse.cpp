@@ -119,6 +119,22 @@ void selects_append_relation(Selects *selects, const char *relation_name)
   selects->relations[selects->relation_num++] = strdup(relation_name);
 }
 
+void reverse_relations(Selects *selects, const int start, const int end)
+{
+  for (int i = start, j = end - 1; i < j; i++, j--) {
+    char *tmp = selects->relations[i];
+    selects->relations[i] = selects->relations[j];
+    selects->relations[j] = tmp;
+  }
+}
+
+void selects_arrange_relation(Selects *selects, const int join_num)
+{
+  int start = selects->relation_num - join_num - 1;
+  reverse_relations(selects, start, start + join_num);
+  reverse_relations(selects, start, selects->relation_num);
+}
+
 void selects_append_join_relation(Selects *selects, const char *relation_name)
 {
   selects->relations[selects->relation_num++] = strdup(relation_name);

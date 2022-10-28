@@ -47,7 +47,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
   // collect tables in `from` statement
   std::vector<Table *> tables;
   std::unordered_map<std::string, Table *> table_map;
-  for (int i = select_sql.relation_num - 1; i >= 0; i--) {
+  for (int i = 0; i < select_sql.relation_num; i++) {
     const char *table_name = select_sql.relations[i];
     if (nullptr == table_name) {
       LOG_WARN("invalid argument. relation name is null. index=%d", i);
@@ -63,7 +63,6 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
     tables.push_back(table);
     table_map.insert(std::pair<std::string, Table *>(table_name, table));
   }
-  std::reverse(tables.begin() + select_sql.relation_num - select_sql.join_num, tables.end());
 
   // collect query fields in `select` statement
   std::vector<Field> query_fields;

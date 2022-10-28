@@ -19,6 +19,7 @@ typedef struct ParserContext {
   Value values[MAX_NUM];
   Condition conditions[MAX_NUM];
   size_t join_length;
+  size_t curr_join_length;
   Condition join_conditions[MAX_NUM][MAX_NUM];
   size_t join_conditions_length[MAX_NUM];
   CompOp comp;
@@ -325,7 +326,7 @@ value:
   		value_init_float(&CONTEXT->values[CONTEXT->value_length++], $1);
 		}
     |SSS {
-			$1 = substr($1,1,strlen($1)-2);
+		$1 = substr($1,1,strlen($1)-2);
   		value_init_string(&CONTEXT->values[CONTEXT->value_length++], $1);
 		}
     ;
@@ -414,6 +415,8 @@ attr_list:
 rel_name:
 	ID join_list {
 		selects_append_relation(&CONTEXT->ssql->sstr.selection, $1);
+		selects_arrange_relation(&CONTEXT->ssql->sstr.selection, CONTEXT->curr_join_length);
+		CONTEXT->curr_join_length=0;
 	}
 rel_list:
     /* empty */
@@ -431,6 +434,7 @@ inner_join:
 	INNER JOIN ID ON join_condition join_condition_list {
 		selects_append_join_relation(&CONTEXT->ssql->sstr.selection, $3);
 		CONTEXT->join_length++;
+		CONTEXT->curr_join_length++;
 		selects_append_join_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->join_conditions[CONTEXT->join_length-1], CONTEXT->join_conditions_length[CONTEXT->join_length-1]);
 	};
 join_condition:
@@ -451,7 +455,7 @@ join_condition:
 		Condition condition;
 		condition_init(&condition, CONTEXT->comp, 0, NULL, left_value, 0, NULL, right_value);
 		CONTEXT->join_conditions[CONTEXT->join_length][CONTEXT->join_conditions_length[CONTEXT->join_length]++] = condition;
-}
+	}
 	| ID comOp ID {
 		RelAttr left_attr;
 		relation_attr_init(&left_attr, NULL, $1);
@@ -461,7 +465,7 @@ join_condition:
 		Condition condition;
 		condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 1, &right_attr, NULL);
 		CONTEXT->join_conditions[CONTEXT->join_length][CONTEXT->join_conditions_length[CONTEXT->join_length]++] = condition;
-}
+	}
     | value comOp ID {
 		Value *left_value = &CONTEXT->values[CONTEXT->value_length - 1];
 		RelAttr right_attr;
@@ -490,7 +494,7 @@ join_condition:
 		condition_init(&condition, CONTEXT->comp, 0, NULL, left_value, 1, &right_attr, NULL);
 		CONTEXT->join_conditions[CONTEXT->join_length][CONTEXT->join_conditions_length[CONTEXT->join_length]++] = condition;
     }
-    |ID DOT ID comOp ID DOT ID {
+    | ID DOT ID comOp ID DOT ID {
 		RelAttr left_attr;
 		relation_attr_init(&left_attr, $1, $3);
 		RelAttr right_attr;
