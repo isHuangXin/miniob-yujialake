@@ -1,0 +1,16 @@
+create table like_table (id int, name char(20));
+insert into like_table values(1,'apple');
+insert into like_table values(2,'cherry');
+insert into like_table values(3,'orange');
+insert into like_table values(5,'APPLE');
+insert into like_table values(6,'ORANGE');
+insert into like_table values(7,'PEACH');
+insert into like_table values(8,'pineapple');
+insert into like_table values(9,'PINEAPPLE');
+insert into like_table values(10,'lemon');
+insert into like_table values(11,'strawberry');
+insert into like_table values(12,'fig');
+SELECT * FROM like_table WHERE name NOT LIKE 'p%' AND name NOT LIKE '%e';
+SELECT * FROM like_table WHERE name LIKE 'c%';
+SELECT * FROM like_table WHERE name LIKE '%e';
+SELECT * FROM like_table WHERE name LIKE '%pp%';

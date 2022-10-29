@@ -1397,8 +1397,10 @@ if __name__ == '__main__':
     exit_code = 1
   else:
     logging.info(f"score: {evaluation['score']}")
+    logging.info("success cases:")
     for msg in evaluation['success']:
       logging.info(msg)
+    logging.info("error cases:")
     for msg in evaluation['error']:
       logging.info(msg)
   exit(exit_code)
