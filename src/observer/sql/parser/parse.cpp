@@ -186,16 +186,24 @@ void selects_destroy(Selects *selects)
   selects->join_num = 0;
 }
 
-void inserts_init(Inserts *inserts, const char *relation_name, Value values[], size_t value_num)
+void inserts_init(Inserts *inserts, const char *relation_name)
 {
-  assert(value_num <= sizeof(inserts->values) / sizeof(inserts->values[0]));
-
   inserts->relation_name = strdup(relation_name);
-  for (size_t i = 0; i < value_num; i++) {
-    inserts->values[i] = values[i];
-  }
-  inserts->value_num = value_num;
 }
+
+void inserts_append_values(Inserts *inserts, size_t row_num, Value values[], size_t value_num)
+{
+  assert(row_num < sizeof(inserts->rows) / sizeof(inserts->rows[0]));
+  assert(value_num < sizeof(inserts->rows[0].values) / sizeof(inserts->rows[0].values[0]));
+  
+  for (size_t i = 0; i < value_num; i++) {
+    inserts->rows[row_num].values[i] = values[i];
+  }
+
+  inserts->rows[row_num].value_num = value_num;
+  inserts->row_num++;
+}
+
 void inserts_destroy(Inserts *inserts)
 {
   free(inserts->relation_name);

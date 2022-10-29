@@ -23,7 +23,8 @@ typedef struct ParserContext {
   Condition join_conditions[MAX_NUM][MAX_NUM];
   size_t join_conditions_length[MAX_NUM];
   CompOp comp;
-	char id[MAX_NUM];
+  char id[MAX_NUM];
+  size_t row_num;
 } ParserContext;
 
 //获取子串
@@ -48,6 +49,7 @@ void yyerror(yyscan_t scanner, const char *str)
   context->select_length = 0;
   context->value_length = 0;
   context->join_length = 0;
+  context->row_num = 0;
   context->ssql->sstr.insertion.value_num = 0;
   printf("parse sql failed. error=%s", str);
 }
@@ -296,8 +298,7 @@ ID_get:
 
 	
 insert:				/*insert   语句的语法解析树*/
-    INSERT INTO ID VALUES LBRACE value value_list RBRACE SEMICOLON 
-		{
+    INSERT INTO ID VALUES LBRACE value value_list RBRACE record_list SEMICOLON {
 			// CONTEXT->values[CONTEXT->value_length++] = *$6;
 
 			CONTEXT->ssql->flag=SCF_INSERT;//"insert";
@@ -306,17 +307,25 @@ insert:				/*insert   语句的语法解析树*/
 			// for(i = 0; i < CONTEXT->value_length; i++){
 			// 	CONTEXT->ssql->sstr.insertion.values[i] = CONTEXT->values[i];
       // }
-			inserts_init(&CONTEXT->ssql->sstr.insertion, $3, CONTEXT->values, CONTEXT->value_length);
-
-      //临时变量清零
-      CONTEXT->value_length=0;
+		inserts_init(&CONTEXT->ssql->sstr.insertion, $3);
+		//临时变量清零
+		CONTEXT->row_num=0;
+		CONTEXT->value_length=0;
     }
+record_list:
+    /* empty */ 
+	| COMMA LBRACE value value_list RBRACE record_list{
 
+	}
+	;
 value_list:
-    /* empty */
+    /* empty */ {
+		inserts_append_values(&CONTEXT->ssql->sstr.insertion, CONTEXT->row_num++, CONTEXT->values, CONTEXT->value_length);
+		CONTEXT->value_length=0;
+	}
     | COMMA value value_list  { 
   		// CONTEXT->values[CONTEXT->value_length++] = *$2;
-	  }
+	}
     ;
 value:
     NUMBER{	
