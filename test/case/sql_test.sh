@@ -5,9 +5,6 @@ python3 miniob_test.py \
         --test-result-dir=result \
         --test-result-tmp-dir=./result_tmp \
         --use-unix-socket \
-        --git-repo=https://github.com/isHuangXin/miniob-yujialake/tree/agg-func \
-        --git-branch=agg-func \
         --code-type=none \
         --target-dir=./miniob \
         --log=stdout \
-        --compile-make-args=-j12 \
