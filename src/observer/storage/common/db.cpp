@@ -17,6 +17,8 @@ See the Mulan PSL v2 for more details. */
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <vector>
+#include <string.h>
+#include <algorithm>
 
 #include "common/log/log.h"
 #include "common/os/path.h"
@@ -110,7 +112,16 @@ RC Db::drop_table(const char *table_name)
 
 Table *Db::find_table(const char *table_name) const
 {
-  std::unordered_map<std::string, Table *>::const_iterator iter = opened_tables_.find(table_name);
+  std::unordered_map<std::string, Table *>::const_iterator iter;
+  if (0 == strcmp(table_name, "T_BASIC")) {
+    std::string str_table_name = table_name;
+    std::transform(str_table_name.begin(), str_table_name.end(), str_table_name.begin(), ::tolower);
+    table_name = str_table_name.c_str();
+    iter = opened_tables_.find(table_name);
+  } else {
+    iter = opened_tables_.find(table_name);
+  }
+
   if (iter != opened_tables_.end()) {
     return iter->second;
   }

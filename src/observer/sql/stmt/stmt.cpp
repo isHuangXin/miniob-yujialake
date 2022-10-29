@@ -47,10 +47,10 @@ RC Stmt::create_stmt(Db *db, const Query &query, Stmt *&stmt)
 
 bool Stmt::check_type(AttrType t1, AttrType t2)
 {
-  if (t1 == AttrType::DATES && t2 != AttrType::DATES && t2 != AttrType::NULLS) {
+  if (t1 == AttrType::DATES && t2 != AttrType::DATES) {
     return false;
   }
-  if (t1 != AttrType::DATES && t2 == AttrType::DATES && t1 != AttrType::NULLS) {
+  if (t1 != AttrType::DATES && t2 == AttrType::DATES) {
     return false;
   }
   return true;

@@ -55,13 +55,6 @@ RC InsertStmt::create(Db *db, const Inserts &inserts, Stmt *&stmt)
     const AttrType field_type = field_meta->type();
     const AttrType value_type = values[i].type;
 
-    assert(!(value_type == AttrType::NULLS) ||
-          (((char *)values[i].data)[field_meta->len() - 1] == 1));
-
-    if (value_type == AttrType::NULLS && !field_meta->nullable()) {
-      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
-    }
-
     if (values[i].type == DATES && *(int*)values[i].data == -1) {
       return RC::SCHEMA_FIELD_TYPE_MISMATCH;
     }
