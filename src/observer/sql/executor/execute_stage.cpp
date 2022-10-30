@@ -612,7 +612,13 @@ RC ExecuteStage::do_insert(SQLStageEvent *sql_event)
   InsertStmt *insert_stmt = (InsertStmt *)stmt;
   Table *table = insert_stmt->table();
 
-  RC rc = table->insert_record(trx, insert_stmt->value_amount(), insert_stmt->values());
+  RC rc = RC::SUCCESS;
+  for (const auto &row : insert_stmt->rows()) {
+    if ((rc = table->insert_record(trx, row.value_num, row.values)) != RC::SUCCESS) {
+      session_event->set_response("FAILURE\n");
+      return rc;
+    }
+  }
   if (rc == RC::SUCCESS) {
     if (!session->is_trx_multi_operation_mode()) {
       CLogRecord *clog_record = nullptr;

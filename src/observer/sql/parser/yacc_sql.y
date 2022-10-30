@@ -25,6 +25,8 @@ typedef struct ParserContext {
   CompOp comp;
   AggrType aggr_t;
   char id[MAX_NUM];
+  char id[MAX_NUM];
+  size_t row_num;
 } ParserContext;
 
 //获取子串
@@ -49,6 +51,7 @@ void yyerror(yyscan_t scanner, const char *str)
   context->select_length = 0;
   context->value_length = 0;
   context->join_length = 0;
+  context->row_num = 0;
   context->ssql->sstr.insertion.value_num = 0;
   printf("parse sql failed. error=%s", str);
 }
@@ -89,6 +92,7 @@ ParserContext *get_context(yyscan_t scanner)
         INT_T
         STRING_T
         FLOAT_T
+		DATE_T
         HELP
         EXIT
         DOT //QUOTE
@@ -118,6 +122,7 @@ ParserContext *get_context(yyscan_t scanner)
 
 		INNER
 		JOIN
+		TEXT_T
 
 %union {
   struct _Attr *attr;
@@ -135,6 +140,7 @@ ParserContext *get_context(yyscan_t scanner)
 %token <string> PATH
 %token <string> SSS
 %token <string> STAR
+%token <string> DATE_STR
 %token <string> STRING_V
 //非终结符
 
@@ -276,7 +282,7 @@ attr_def:
     |ID_get type
 		{
 			AttrInfo attribute;
-			attr_info_init(&attribute, CONTEXT->id, $2, 4);
+			attr_info_init(&attribute, CONTEXT->id, $2, $2 == TEXTS ? 4096 : 4);
 			create_table_append_attribute(&CONTEXT->ssql->sstr.create_table, &attribute);
 			// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name=(char*)malloc(sizeof(char));
 			// strcpy(CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name, CONTEXT->id); 
@@ -292,6 +298,8 @@ type:
 	INT_T { $$=INTS; }
        | STRING_T { $$=CHARS; }
        | FLOAT_T { $$=FLOATS; }
+       | TEXT_T { $$=TEXTS; }
+	   | DATE_T { $$=DATES; }
        ;
 ID_get:
 	ID 
@@ -303,8 +311,7 @@ ID_get:
 
 	
 insert:				/*insert   语句的语法解析树*/
-    INSERT INTO ID VALUES LBRACE value value_list RBRACE SEMICOLON 
-		{
+    INSERT INTO ID VALUES LBRACE value value_list RBRACE record_list SEMICOLON {
 			// CONTEXT->values[CONTEXT->value_length++] = *$6;
 
 			CONTEXT->ssql->flag=SCF_INSERT;//"insert";
@@ -313,17 +320,25 @@ insert:				/*insert   语句的语法解析树*/
 			// for(i = 0; i < CONTEXT->value_length; i++){
 			// 	CONTEXT->ssql->sstr.insertion.values[i] = CONTEXT->values[i];
       // }
-			inserts_init(&CONTEXT->ssql->sstr.insertion, $3, CONTEXT->values, CONTEXT->value_length);
-
-      //临时变量清零
-      CONTEXT->value_length=0;
+		inserts_init(&CONTEXT->ssql->sstr.insertion, $3);
+		//临时变量清零
+		CONTEXT->row_num=0;
+		CONTEXT->value_length=0;
     }
+record_list:
+    /* empty */ 
+	| COMMA LBRACE value value_list RBRACE record_list{
 
+	}
+	;
 value_list:
-    /* empty */
+    /* empty */ {
+		inserts_append_values(&CONTEXT->ssql->sstr.insertion, CONTEXT->row_num++, CONTEXT->values, CONTEXT->value_length);
+		CONTEXT->value_length=0;
+	}
     | COMMA value value_list  { 
   		// CONTEXT->values[CONTEXT->value_length++] = *$2;
-	  }
+	}
     ;
 value:
     NUMBER{	
@@ -336,6 +351,9 @@ value:
 		$1 = substr($1,1,strlen($1)-2);
   		value_init_string(&CONTEXT->values[CONTEXT->value_length++], $1);
 		}
+	|DATE_STR {
+        value_init_date(&CONTEXT->values[CONTEXT->value_length++], $1);
+    }
     ;
     
 delete:		/*  delete 语句的语法解析树*/

@@ -731,7 +731,10 @@ RC Table::update_record(Trx *trx, const char *attribute_name, const Value *value
   }
 
   if (fieldMeta->type() != value->type) {
-    return RC::SCHEMA_FIELD_NOT_EXIST;
+    if ((fieldMeta->type() == TEXTS && value->type == CHARS)) {
+    } else {
+      return RC::SCHEMA_FIELD_NOT_EXIST;
+    }
   }
 
   RecordUpdater updater(*this, trx, fieldMeta, value);

@@ -42,7 +42,7 @@ typedef enum {
 } CompOp;
 
 //属性值类型
-typedef enum { UNDEFINED, CHARS, INTS, FLOATS } AttrType;
+typedef enum { UNDEFINED, CHARS, INTS, DATES, TEXTS, FLOATS } AttrType;
 
 //聚合函数类型
 typedef enum { INVALID, MAX, MIN, SUM, AVG, COUNT } AggrType;
@@ -88,11 +88,18 @@ typedef struct {
   Condition join_conditions[MAX_NUM][MAX_NUM];  // conditions in join clause
 } Selects;
 
+typedef struct {
+  size_t value_num;       // Length of values
+  Value values[MAX_NUM];  // values to insert
+} Row;
+
 // struct of insert
 typedef struct {
   char *relation_name;    // Relation to insert into
   size_t value_num;       // Length of values
   Value values[MAX_NUM];  // values to insert
+  size_t row_num;         // number of row
+  Row rows[MAX_NUM];      // rows to insert
 } Inserts;
 
 // struct of delete
@@ -213,6 +220,7 @@ void relation_aggr_destroy(AggrAttr *aggr_attr);
 void value_init_integer(Value *value, int v);
 void value_init_float(Value *value, float v);
 void value_init_string(Value *value, const char *v);
+void value_init_date(Value *value, const char* v);
 void value_destroy(Value *value);
 
 void condition_init(Condition *condition, CompOp comp, int left_is_attr, RelAttr *left_attr, Value *left_value,
@@ -232,7 +240,8 @@ void selects_append_join_relation(Selects *selects, const char *relation_name);
 void selects_append_join_conditions(Selects *selects, Condition conditions[], size_t condition_num);
 void selects_destroy(Selects *selects);
 
-void inserts_init(Inserts *inserts, const char *relation_name, Value values[], size_t value_num);
+void inserts_init(Inserts *inserts, const char *relation_name);
+void inserts_append_values(Inserts *inserts, size_t row_num, Value values[], size_t value_num);
 void inserts_destroy(Inserts *inserts);
 
 void deletes_init_relation(Deletes *deletes, const char *relation_name);

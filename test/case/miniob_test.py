@@ -741,6 +741,14 @@ class EvalResult:
     json_encoder.key_separator = ':'
     return json_encoder.encode(json_dict)
   
+  def to_human_string(self):
+    result_dict = {}
+    result_dict['score']= self.get_score()
+    result_dict['success'] = [msg for msg in self.__message if msg.endswith('success')]
+    result_dict['error'] = [msg for msg in self.__message if msg.endswith('error')]
+
+    return result_dict
+  
 class TestSuite:
 
   def __init__(self):
@@ -1376,7 +1384,7 @@ def run(options):
     eval_result.set_no_cost()
     eval_result.clear_score()
 
-  return result, eval_result.to_json_string()
+  return result, eval_result.to_human_string()
 
 if __name__ == '__main__':
   os.setpgrp()
@@ -1388,6 +1396,12 @@ if __name__ == '__main__':
   if result is False:
     exit_code = 1
   else:
-    logging.info(evaluation)
+    logging.info(f"score: {evaluation['score']}")
+    logging.info("success cases:")
+    for msg in evaluation['success']:
+      logging.info(msg)
+    logging.info("error cases:")
+    for msg in evaluation['error']:
+      logging.info(msg)
   exit(exit_code)
 

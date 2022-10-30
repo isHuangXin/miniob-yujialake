@@ -17,3 +17,4 @@ See the Mulan PSL v2 for more details. */
 #include <string>
 
 std::string double2string(double v);
+std::string date_to_string(int date);
