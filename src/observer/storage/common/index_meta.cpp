@@ -35,9 +35,10 @@ RC IndexMeta::init(const char *name, std::vector<const FieldMeta *> fields)
   }
 
   name_ = name;
-  field_num = fields.size();
-  for (int i = 0; i < field_num; i++) {
-    fields_[i] = fields[i]->name();
+  field_num_ = fields.size();
+  for (int i = 0; i < field_num_; i++) {
+    fields_.push_back(fields[i]->name());
+    // fields_[i] = fields[i]->name();
   }
   // field_ = field.name();
   return RC::SUCCESS;
@@ -113,13 +114,13 @@ const char *IndexMeta::field(int i) const
 
 const int IndexMeta::fields_num() const
 {
-  return field_num;
+  return field_num_;
 }
 void IndexMeta::desc(std::ostream &os) const
 {
   // os << "index name=" << name_ << ", field=" << field_;
   os << "index name=" << name_ << ", field=" << fields_[0];
-  for (int i = 1; i < field_num; i++) {
+  for (int i = 1; i < field_num_; i++) {
     os << ", " + fields_[i];
   }
 }

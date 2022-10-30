@@ -178,6 +178,7 @@ const IndexMeta *TableMeta::find_index_by_field(const char * field) const
       return &index;
     }
   }
+  return nullptr;
 }
 
 const IndexMeta *TableMeta::find_index_by_fields(char* const* fields, int num) const

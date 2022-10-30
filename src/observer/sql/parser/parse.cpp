@@ -389,11 +389,11 @@ void create_index_init(
 {
   create_index->index_name = strdup(index_name);
   create_index->relation_name = strdup(relation_name);
-  create_index->attribute_num = 0;
+  // create_index->attribute_num = 0;
   // create_index->attribute_name = strdup(attr_name);
 }
 
-void create_index_add(CreateIndex *create_index, const char *index_name, const char *relation_name, const char *attr_name)
+void create_index_add(CreateIndex *create_index, const char *attr_name)
 {
   if (create_index->attribute_num == MAX_NUM) {
     return;

@@ -230,16 +230,17 @@ desc_table:
     ;
 
 create_index:		/*create index 语句的语法解析树*/
-    CREATE INDEX ID ON ID LBRACE ID RBRACE SEMICOLON 
+    CREATE INDEX ID ON ID LBRACE ID id_list RBRACE SEMICOLON 
 		{
 			CONTEXT->ssql->flag = SCF_CREATE_INDEX;//"create_index";
-			create_index_init(&CONTEXT->ssql->sstr.create_index, $3, $5, $7);
+			create_index_init(&CONTEXT->ssql->sstr.create_index, $3, $5);
+			create_index_add(&CONTEXT->ssql->sstr.create_index, $7);
 		}
     ;
 id_list:
 	| COMMA ID id_list
 		{
-			create_index_add(&CONTEXT->ssql->sstr.create, $2);
+			create_index_add(&CONTEXT->ssql->sstr.create_index, $2);
 		}
 	;
 drop_index:			/*drop index 语句的语法解析树*/

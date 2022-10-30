@@ -16,6 +16,7 @@ See the Mulan PSL v2 for more details. */
 #define __OBSERVER_STORAGE_COMMON_INDEX_META_H__
 
 #include <string>
+#include <vector>
 #include "rc.h"
 
 class TableMeta;
@@ -46,6 +47,6 @@ protected:
   std::string name_;   // index's name
   // std::string field_;  // field's name
   std::vector<std::string> fields_; // fields' name
-  int field_num;
+  int field_num_;
 };
 #endif  // __OBSERVER_STORAGE_COMMON_INDEX_META_H__
