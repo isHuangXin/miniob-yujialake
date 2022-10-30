@@ -22,7 +22,6 @@ See the Mulan PSL v2 for more details. */
 #include "sql/parser/parse_defs.h"
 #include <vector>
 
-// TODO fixme
 class AggrOperator : public Operator {
 public:
   AggrOperator(const std::vector<Field> &aggr_fields)

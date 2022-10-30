@@ -25,7 +25,6 @@ typedef struct ParserContext {
   CompOp comp;
   AggrType aggr_t;
   char id[MAX_NUM];
-  char id[MAX_NUM];
   size_t row_num;
 } ParserContext;
 

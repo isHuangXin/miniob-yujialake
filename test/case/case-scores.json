@@ -8,6 +8,8 @@
   "primary-drop-table":{"necessary":true, "score":10},
   "2022-join-tables":{"necessary":false, "score":20},
   "2022-like":{"necessary":false, "score":20},
+  "2022-aggregation-func":{"necessary":false, "score":20},
+  "2022-aggregation-func2":{"necessary":false, "score":20},
 
   "primary-insert":{"necessary":false, "score":10},
   "primary-join-tables":{"necessary":false, "score":20},

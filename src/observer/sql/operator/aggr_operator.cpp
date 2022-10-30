@@ -196,7 +196,9 @@ RC AggrOperator::do_aggr_avg(const int index, TupleCell &res_cell)
   char *data = new char[length];
   memset(data, 0, length);
   res_cell.set_length(length);
-  res /= cnt;
+  if (cnt != 0) {
+    res /= cnt;
+  }
   memcpy(data, &res, length - 1);
   res_cell.set_data(data);
   return rc;

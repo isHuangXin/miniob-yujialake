@@ -142,7 +142,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
     if (aggr_attr.aggr_type == COUNT && aggr_attr.is_attr && 0 == strcmp(aggr_attr.attr.attribute_name, "*")) {
       f.set_aggr_param("*");
     }
-    // COUNT(id)
+    // AGG_FUNC(id)
     else if (aggr_attr.is_attr) {
       const char *field_name = aggr_attr.attr.attribute_name;
       const char *table_name = aggr_attr.attr.relation_name;
@@ -155,6 +155,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
           LOG_WARN("no such table in from list: %s", table_name);
           return RC::SCHEMA_FIELD_MISSING;
         }
+        table = iter->second;
       }
 
       const FieldMeta *field_meta = table->table_meta().field(field_name);

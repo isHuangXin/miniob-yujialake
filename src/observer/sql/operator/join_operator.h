@@ -20,7 +20,6 @@ See the Mulan PSL v2 for more details. */
 #include "rc.h"
 #include "sql/stmt/filter_stmt.h"
 
-// TODO fixme
 class JoinOperator : public Operator {
 public:
   JoinOperator(Operator *left, Operator *right, FilterStmt *filter = nullptr)
