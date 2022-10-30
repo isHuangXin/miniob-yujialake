@@ -90,6 +90,7 @@ ParserContext *get_context(yyscan_t scanner)
         INT_T
         STRING_T
         FLOAT_T
+		DATE_T
         HELP
         EXIT
         DOT //QUOTE
@@ -131,6 +132,7 @@ ParserContext *get_context(yyscan_t scanner)
 %token <string> PATH
 %token <string> SSS
 %token <string> STAR
+%token <string> DATE_STR
 %token <string> STRING_V
 //非终结符
 
@@ -289,6 +291,7 @@ type:
        | STRING_T { $$=CHARS; }
        | FLOAT_T { $$=FLOATS; }
        | TEXT_T { $$=TEXTS; }
+	   | DATE_T { $$=DATES; }
        ;
 ID_get:
 	ID 
@@ -340,6 +343,9 @@ value:
 		$1 = substr($1,1,strlen($1)-2);
   		value_init_string(&CONTEXT->values[CONTEXT->value_length++], $1);
 		}
+	|DATE_STR {
+        value_init_date(&CONTEXT->values[CONTEXT->value_length++], $1);
+    }
     ;
     
 delete:		/*  delete 语句的语法解析树*/

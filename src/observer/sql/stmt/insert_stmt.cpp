@@ -63,6 +63,10 @@ RC InsertStmt::create(Db *db, const Inserts &inserts, Stmt *&stmt)
       const AttrType field_type = field_meta->type();
       const AttrType value_type = row.values[j].type;
       const Value &value = row.values[j];
+      // DATE 类型的日期不符合要求
+      if (values[i].type == DATES && *(int*)values[i].data == -1) {
+      return RC::INVALID_ARGUMENT;
+      }
       // 按照test case，第二行数据若不匹配则插入失败
       if (i > 0 && field_type != value_type) {
         return SCHEMA_FIELD_TYPE_MISMATCH;

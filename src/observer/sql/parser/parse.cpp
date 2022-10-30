@@ -57,6 +57,53 @@ void value_init_string(Value *value, const char *v)
   value->type = CHARS;
   value->data = strdup(v);
 }
+
+bool is_leap(int y)
+{
+  return (((y % 4 == 0) &&
+           (y % 100 != 0)) ||
+           (y % 400 == 0));
+}
+
+bool check_date(int y, int m, int d)
+{
+  if (m < 1 || m > 12) {
+    return false;
+  }
+
+  if (d < 1 || d > 31) {
+    return false;
+  }
+
+  if (m == 2) {
+    if (is_leap(y))
+      return (d <= 29);
+    else
+      return (d <= 28);
+  }
+
+  if (m == 4 || m == 6 ||
+      m == 9 || m == 11) {
+    return (d <= 30);
+  }
+  return true;
+}
+
+void value_init_date(Value *value, const char* v)
+{
+  value->type = DATES;
+  int y, m, d;
+  std::sscanf(v, "'%d-%d-%d'", &y, &m, &d);
+
+  int dv = y * 10000 + m * 100 + d;
+  value->data = std::malloc(sizeof(int));
+  bool b = check_date(y, m, d);
+  if (!b) {
+    dv = -1;
+  }
+  memcpy(value->data, &dv, sizeof(int));
+}
+
 void value_destroy(Value *value)
 {
   value->type = UNDEFINED;
