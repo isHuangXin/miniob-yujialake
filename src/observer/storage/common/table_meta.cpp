@@ -118,6 +118,7 @@ const FieldMeta *TableMeta::field(int index) const
 {
   return &fields_[index];
 }
+// 这个应该用不上了，改成多列了
 const FieldMeta *TableMeta::field(const char *name) const
 {
   if (nullptr == name) {
@@ -131,6 +132,15 @@ const FieldMeta *TableMeta::field(const char *name) const
   }
   return nullptr;
 }
+
+// const FieldMeta *TableMeta::fields(char* const* name) const
+// {
+//   if (nullptr == name) {
+//     return nullptr;
+//   }
+//   // TODO:
+
+// }
 
 const FieldMeta *TableMeta::find_field_by_offset(int offset) const
 {
@@ -161,12 +171,36 @@ const IndexMeta *TableMeta::index(const char *name) const
   return nullptr;
 }
 
-const IndexMeta *TableMeta::find_index_by_field(const char *field) const
+const IndexMeta *TableMeta::find_index_by_field(const char * field) const
 {
   for (const IndexMeta &index : indexes_) {
     if (0 == strcmp(index.field(), field)) {
       return &index;
     }
+  }
+}
+
+const IndexMeta *TableMeta::find_index_by_fields(char* const* fields, int num) const
+{
+  // for (const IndexMeta &index : indexes_) {
+  //   if (0 == strcmp(index.field(), field)) {
+  //     return &index;
+  //   }
+  // }
+  for (const IndexMeta &index : indexes_) {
+    if (num != index.fields_num()) {
+      continue;
+    }
+    bool flg = true;
+    for (int i = 0; i < num; i++) {
+      if (strcmp(fields[i], index.field(i)) != 0) {
+        // continue;
+        flg = false;
+        break;
+      }
+    }
+    if (flg)
+      return &index;
   }
   return nullptr;
 }

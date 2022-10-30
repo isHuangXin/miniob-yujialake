@@ -504,6 +504,7 @@ RC ExecuteStage::do_create_table(SQLStageEvent *sql_event)
 }
 RC ExecuteStage::do_create_index(SQLStageEvent *sql_event)
 {
+  //TODO:实现multi-index
   SessionEvent *session_event = sql_event->session_event();
   Db *db = session_event->session()->get_current_db();
   const CreateIndex &create_index = sql_event->query()->sstr.create_index;
@@ -513,7 +514,7 @@ RC ExecuteStage::do_create_index(SQLStageEvent *sql_event)
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
-  RC rc = table->create_index(nullptr, create_index.index_name, create_index.attribute_name);
+  RC rc = table->create_index(nullptr, create_index.index_name, create_index.attribute_name, create_index.attribute_num);
   sql_event->session_event()->set_response(rc == RC::SUCCESS ? "SUCCESS\n" : "FAILURE\n");
   return rc;
 }

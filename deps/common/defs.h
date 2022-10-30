@@ -32,6 +32,8 @@ namespace common {
 #define gettid() ((long long)pthread_self())
 #elif defined(LINUX)
 #define gettid() ((long long)pthread_self())
+#else
+#define gettid() ((long long)pthread_self())
 #endif
 
 #endif

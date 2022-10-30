@@ -593,36 +593,57 @@ static RC insert_index_record_reader_adapter(Record *record, void *context)
   return inserter.insert_index(record);
 }
 
-RC Table::create_index(Trx *trx, const char *index_name, const char *attribute_name)
+RC Table::create_index(Trx *trx, const char *index_name, char* const* attribute_name, int attribute_num)
 {
-  if (common::is_blank(index_name) || common::is_blank(attribute_name)) {
-    LOG_INFO("Invalid input arguments, table name is %s, index_name is blank or attribute_name is blank", name());
+  //TODO:multi-index
+  if (common::is_blank(index_name)) {
+    LOG_INFO("Invalid input arguments, table name is %s, index_name is blank", name());
     return RC::INVALID_ARGUMENT;
   }
-  if (table_meta_.index(index_name) != nullptr || table_meta_.find_index_by_field((attribute_name))) {
-    LOG_INFO("Invalid input arguments, table name is %s, index %s exist or attribute %s exist index",
-             name(), index_name, attribute_name);
+  for (int i = 0; i < attribute_num; i++) {
+    if (common::is_blank(attribute_name[i])) {
+      LOG_INFO("Invalid input arguments, table name is %s, attribute_name is blank", name());
+      return RC::INVALID_ARGUMENT;
+    }
+  }
+  // if (table_meta_.index(index_name) != nullptr) {
+  //   LOG_INFO("Invalid input arguments, table name is %s, index %s exist",
+  //            name(), index_name);
+  //   return RC::SCHEMA_INDEX_EXIST;
+  // }
+
+  if (table_meta_.index(index_name) != nullptr || table_meta_.find_index_by_fields(attribute_name, attribute_num)) {
+    // LOG_INFO("Invalid input arguments, table name is %s, index %s exist or attribute %s exist index",
+    //          name(), index_name, attribute_name);
     return RC::SCHEMA_INDEX_EXIST;
   }
-
-  const FieldMeta *field_meta = table_meta_.field(attribute_name);
-  if (!field_meta) {
-    LOG_INFO("Invalid input arguments, there is no field of %s in table:%s.", attribute_name, name());
-    return RC::SCHEMA_FIELD_MISSING;
+  std::vector<const FieldMeta *> fields_meta;
+  // 表里应该有这个属性
+  
+  for (int i = 0; i < attribute_num; i++) {
+    const FieldMeta* t = table_meta_.field(attribute_name[i]);
+    if (!t) {
+      return RC::SCHEMA_FIELD_MISSING;
+    }
+    fields_meta.push_back(t);
   }
+  // if (!field_meta) {
+  //   LOG_INFO("Invalid input arguments, there is no field of %s in table:%s.", attribute_name, name());
+  //   return RC::SCHEMA_FIELD_MISSING;
+  // }
 
   IndexMeta new_index_meta;
-  RC rc = new_index_meta.init(index_name, *field_meta);
+  RC rc = new_index_meta.init(index_name, fields_meta);
   if (rc != RC::SUCCESS) {
-    LOG_INFO("Failed to init IndexMeta in table:%s, index_name:%s, field_name:%s",
-             name(), index_name, attribute_name);
+    // LOG_INFO("Failed to init IndexMeta in table:%s, index_name:%s, field_name:%s",
+    //          name(), index_name, attribute_name);
     return rc;
   }
 
   // 创建索引相关数据
   BplusTreeIndex *index = new BplusTreeIndex();
   std::string index_file = table_index_file(base_dir_.c_str(), name(), index_name);
-  rc = index->create(index_file.c_str(), new_index_meta, *field_meta);
+  rc = index->create(index_file.c_str(), new_index_meta, *(fields_meta[0]));  // not implemented yet
   if (rc != RC::SUCCESS) {
     delete index;
     LOG_ERROR("Failed to create bplus tree index. file name=%s, rc=%d:%s", index_file.c_str(), rc, strrc(rc));

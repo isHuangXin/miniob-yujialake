@@ -236,7 +236,12 @@ create_index:		/*create index 语句的语法解析树*/
 			create_index_init(&CONTEXT->ssql->sstr.create_index, $3, $5, $7);
 		}
     ;
-
+id_list:
+	| COMMA ID id_list
+		{
+			create_index_add(&CONTEXT->ssql->sstr.create, $2);
+		}
+	;
 drop_index:			/*drop index 语句的语法解析树*/
     DROP INDEX ID  SEMICOLON 
 		{
