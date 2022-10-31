@@ -142,6 +142,7 @@ typedef struct {
   char *relation_name;   // Relation name
   char *attribute_name[MAX_NUM];  // Attributes name
   int attribute_num;  // Attribute num
+  int is_unique;
 } CreateIndex;
 
 // struct of  drop_index
@@ -261,7 +262,7 @@ void drop_table_init(DropTable *drop_table, const char *relation_name);
 void drop_table_destroy(DropTable *drop_table);
 
 void create_index_init(
-    CreateIndex *create_index, const char *index_name, const char *relation_name);
+    CreateIndex *create_index, const char *index_name, const char *relation_name, int is_unique);
   void create_index_add(CreateIndex *create_index, const char *attr_name);
 void create_index_destroy(CreateIndex *create_index);
 

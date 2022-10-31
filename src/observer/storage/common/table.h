@@ -67,7 +67,7 @@ public:
   RC scan_record(Trx *trx, ConditionFilter *filter, int limit, void *context,
       void (*record_reader)(const char *data, void *context));
 
-  RC create_index(Trx *trx, const char *index_name, char* const* attribute_name, int attribute_num);
+  RC create_index(Trx *trx, const char *index_name, char* const* attribute_name, int attribute_num, int is_unique);
 
   RC get_record_scanner(RecordFileScanner &scanner);
 

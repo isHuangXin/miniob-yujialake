@@ -385,10 +385,11 @@ void drop_table_destroy(DropTable *drop_table)
 }
 
 void create_index_init(
-    CreateIndex *create_index, const char *index_name, const char *relation_name)
+    CreateIndex *create_index, const char *index_name, const char *relation_name, int is_unique)
 {
   create_index->index_name = strdup(index_name);
   create_index->relation_name = strdup(relation_name);
+  create_index->is_unique = is_unique;
   // create_index->attribute_num = 0;
   // create_index->attribute_name = strdup(attr_name);
 }
