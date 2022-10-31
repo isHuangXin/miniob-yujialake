@@ -79,7 +79,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
         wildcard_fields(table, query_fields);
       }
 
-    } else if (!common::is_blank(relation_attr.relation_name)) {  // TODO
+    } else if (!common::is_blank(relation_attr.relation_name)) {
       const char *table_name = relation_attr.relation_name;
       const char *field_name = relation_attr.attribute_name;
 
@@ -198,7 +198,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
     default_table = tables[0];
   }
 
-  // 为每个join建立一个filter statement
+  // 为每个inner join建立一个filter statement
   std::vector<FilterStmt *> join_filters;
   for (size_t i = 0; i < select_sql.join_num; i++) {
     FilterStmt *stmt = nullptr;
@@ -220,11 +220,57 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
     return rc;
   }
 
+  // 收集order by字段
+  std::vector<Field> order_fields;
+  for (size_t i = 0; i < select_sql.order_num; i++) {
+    const OrderAttr &order_attr = select_sql.order_attrs[i];
+    const auto attr = order_attr.attr;
+    Field f;
+    f.set_desc(order_attr.is_desc);
+    if (!common::is_blank(attr.relation_name)) {
+      const char *table_name = attr.relation_name;
+      const char *field_name = attr.attribute_name;
+
+      auto iter = table_map.find(table_name);
+      if (iter == table_map.end()) {
+        LOG_WARN("no such table in from list: %s", table_name);
+        return RC::SCHEMA_FIELD_MISSING;
+      }
+
+      Table *table = iter->second;
+      const FieldMeta *field_meta = table->table_meta().field(field_name);
+      if (nullptr == field_meta) {
+        LOG_WARN("no such field. field=%s.%s.%s", db->name(), table->name(), field_name);
+        return RC::SCHEMA_FIELD_MISSING;
+      }
+
+      f.set_table(table);
+      f.set_field(field_meta);
+    } else {
+      if (tables.size() != 1) {
+        LOG_WARN("invalid. I do not know the attr's table. attr=%s", attr.attribute_name);
+        return RC::SCHEMA_FIELD_MISSING;
+      }
+
+      Table *table = tables[0];
+      const FieldMeta *field_meta = table->table_meta().field(attr.attribute_name);
+      if (nullptr == field_meta) {
+        LOG_WARN("no such field. field=%s.%s.%s", db->name(), table->name(), attr.attribute_name);
+        return RC::SCHEMA_FIELD_MISSING;
+      }
+
+      f.set_table(table);
+      f.set_field(field_meta);
+    }
+    order_fields.push_back(f);
+  }
+
   // everything alright
   SelectStmt *select_stmt = new SelectStmt();
   select_stmt->tables_.swap(tables);
   select_stmt->query_fields_.swap(query_fields);
   select_stmt->aggr_fields_.swap(aggr_fields);
+  select_stmt->order_fields_.swap(order_fields);
   select_stmt->filter_stmt_ = filter_stmt;
   select_stmt->join_filters_.swap(join_filters);
   stmt = select_stmt;

@@ -20,7 +20,7 @@ See the Mulan PSL v2 for more details. */
 class Field {
 public:
   Field() = default;
-  Field(const Table *table, const FieldMeta *field) : table_(table), field_(field), aggr_type_(INVALID)
+  Field(const Table *table, const FieldMeta *field) : table_(table), field_(field)
   {}
 
   const Table *table() const
@@ -75,9 +75,20 @@ public:
     this->field_ = field;
   }
 
+  bool is_desc() const
+  {
+    return is_desc_;
+  }
+
+  void set_desc(bool is_desc)
+  {
+    this->is_desc_ = is_desc;
+  }
+
 private:
   const Table *table_ = nullptr;
   const FieldMeta *field_ = nullptr;
-  AggrType aggr_type_;
+  AggrType aggr_type_ = INVALID;
   std::string aggr_param_;
+  bool is_desc_ = false;
 };

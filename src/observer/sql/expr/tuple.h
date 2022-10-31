@@ -66,6 +66,13 @@ public:
   virtual int cell_num() const = 0;
   virtual RC cell_at(int index, TupleCell &cell) const = 0;
   virtual RC find_cell(const Field &field, TupleCell &cell) const = 0;
+  /**
+   * @brief tuple cell index in a tuple
+   * 
+   * @param field 
+   * @return int index
+   */
+  virtual int find_cell_index(const Field &field) const = 0;
 
   virtual RC cell_spec_at(int index, const TupleCellSpec *&spec) const = 0;
 };
@@ -116,11 +123,11 @@ public:
     return RC::SUCCESS;
   }
 
-  RC find_cell(const Field &field, TupleCell &cell) const override
+  int find_cell_index(const Field &field) const override
   {
     const char *table_name = field.table_name();
     if (0 != strcmp(table_name, table_->name())) {
-      return RC::NOTFOUND;
+      return -1;
     }
 
     const char *field_name = field.field_name();
@@ -128,10 +135,17 @@ public:
       const FieldExpr *field_expr = (const FieldExpr *)speces_[i]->expression();
       const Field &field = field_expr->field();
       if (0 == strcmp(field_name, field.field_name())) {
-        return cell_at(i, cell);
+        return i;
       }
     }
-    return RC::NOTFOUND;
+
+    return -1;
+  }
+
+  RC find_cell(const Field &field, TupleCell &cell) const override
+  {
+    const int idx = find_cell_index(field);
+    return idx == -1 ? RC::NOTFOUND : cell_at(idx, cell);
   }
 
   RC cell_spec_at(int index, const TupleCellSpec *&spec) const override
@@ -221,9 +235,27 @@ public:
     return cells_[index];
   }
 
+  int find_cell_index(const Field &field) const override
+  {
+    const char *field_name = field.field_name();
+    for (size_t i = 0; i < speces_.size(); ++i) {
+      const FieldExpr *field_expr = (const FieldExpr *)speces_[i]->expression();
+      const Field &field = field_expr->field();
+      if (0 == strcmp(field_name, field.field_name())) {
+        return i;
+      }
+    }
+
+    return -1;
+  }
+
   RC find_cell(const Field &field, TupleCell &cell) const override
   {
-    return tuple_->find_cell(field, cell);
+    const int idx = find_cell_index(field);
+    if (idx == -1) {
+      return RC::NOTFOUND;
+    }
+    return cell_at(idx, cell);
   }
 
   RC cell_spec_at(int index, const TupleCellSpec *&spec) const override
@@ -238,6 +270,68 @@ public:
 private:
   Tuple *tuple_ = nullptr;
   std::vector<TupleCellSpec *> speces_;
+  std::vector<TupleCell> cells_;
+};
+
+class OrderByTuple : public Tuple {
+public:
+  OrderByTuple() = default;
+  OrderByTuple(Tuple *tuple) : tuple_(tuple)
+  {
+    for (size_t i = 0; i < tuple_->cell_num(); i++) {
+      TupleCell cell;
+      tuple->cell_at(i, cell);
+      cells_.push_back(cell);
+    }
+  }
+  virtual ~OrderByTuple() = default;
+
+  int cell_num() const override
+  {
+    return cells_.size();
+  }
+
+  int find_cell_index(const Field &field) const override
+  {
+    return tuple_->find_cell_index(field);
+  }
+
+  RC cell_at(int index, TupleCell &cell) const override
+  {
+    if (index < 0 || index >= static_cast<int>(cell_num())) {
+      return RC::GENERIC_ERROR;
+    }
+    if (tuple_ == nullptr) {
+      return RC::GENERIC_ERROR;
+    }
+
+    cell = cells_[index];
+    return RC::SUCCESS;
+  }
+
+  TupleCell &cell_at(int index)
+  {
+    return cells_[index];
+  }
+
+  RC find_cell(const Field &field, TupleCell &cell) const override
+  {
+    const int idx = find_cell_index(field);
+    if (idx == -1) {
+      return RC::NOTFOUND;
+    }
+
+    cell = cells_[idx];
+    return RC::SUCCESS;
+  }
+
+  RC cell_spec_at(int index, const TupleCellSpec *&spec) const override
+  {
+    return tuple_->cell_spec_at(index, spec);
+  }
+
+private:
+  Tuple *tuple_ = nullptr;
   std::vector<TupleCell> cells_;
 };
 
@@ -266,6 +360,11 @@ public:
     return speces_.size();
   }
 
+  int find_cell_index(const Field &field) const override
+  {
+    return tuple_->find_cell_index(field);
+  }
+
   RC cell_at(int index, TupleCell &cell) const override
   {
     if (index < 0 || index >= static_cast<int>(speces_.size())) {
@@ -287,6 +386,7 @@ public:
   {
     return tuple_->find_cell(field, cell);
   }
+
   RC cell_spec_at(int index, const TupleCellSpec *&spec) const override
   {
     if (index < 0 || index >= static_cast<int>(speces_.size())) {
@@ -327,6 +427,19 @@ public:
     }
 
     return tuple->cell_at(index, cell);
+  }
+
+  int find_cell_index(const Field &field) const override
+  {
+    int left_idx = -1;
+    if ((left_idx = left_->find_cell_index(field)) != -1) {
+      return left_idx;
+    }
+    int right_idx = -1;
+    if ((right_idx = right_->find_cell_index(field)) != -1) {
+      return left_->cell_num() + right_idx;
+    }
+    return -1;
   }
 
   RC find_cell(const Field &field, TupleCell &cell) const override

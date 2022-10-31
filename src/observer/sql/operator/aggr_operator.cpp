@@ -35,7 +35,7 @@ RC AggrOperator::open()
 
 RC AggrOperator::next()
 {
-  if (aggr_fields_.size() == 0) {
+  if (aggr_fields_.empty()) {
     return children_[0]->next();
   }
 
@@ -96,11 +96,11 @@ RC AggrOperator::close()
 
 Tuple *AggrOperator::current_tuple()
 {
-  is_aggr = true;
-  if (aggr_fields_.size() == 0) {
+  if (aggr_fields_.empty()) {
     return children_[0]->current_tuple();
   }
 
+  is_aggr = true;
   return aggr_tuple;
 }
 

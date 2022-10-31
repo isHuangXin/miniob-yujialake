@@ -88,9 +88,7 @@ void value_init_string(Value *value, const char *v)
 
 bool is_leap(int y)
 {
-  return (((y % 4 == 0) &&
-           (y % 100 != 0)) ||
-           (y % 400 == 0));
+  return (((y % 4 == 0) && (y % 100 != 0)) || (y % 400 == 0));
 }
 
 bool check_date(int y, int m, int d)
@@ -110,14 +108,13 @@ bool check_date(int y, int m, int d)
       return (d <= 28);
   }
 
-  if (m == 4 || m == 6 ||
-      m == 9 || m == 11) {
+  if (m == 4 || m == 6 || m == 9 || m == 11) {
     return (d <= 30);
   }
   return true;
 }
 
-void value_init_date(Value *value, const char* v)
+void value_init_date(Value *value, const char *v)
 {
   value->type = DATES;
   int y, m, d;
@@ -172,11 +169,12 @@ void condition_destroy(Condition *condition)
   }
 }
 
-void attr_info_init(AttrInfo *attr_info, const char *name, AttrType type, size_t length)
+void attr_info_init(AttrInfo *attr_info, const char *name, AttrType type, size_t length, int nullable)
 {
   attr_info->name = strdup(name);
   attr_info->type = type;
   attr_info->length = length;
+  attr_info->nullable = nullable;
 }
 void attr_info_destroy(AttrInfo *attr_info)
 {
@@ -188,6 +186,12 @@ void selects_init(Selects *selects, ...);
 void selects_append_attribute(Selects *selects, RelAttr *rel_attr)
 {
   selects->attributes[selects->attr_num++] = *rel_attr;
+}
+
+void selects_append_order_attr(Selects *selects, RelAttr *rel_attr, int is_desc)
+{
+  selects->order_attrs[selects->order_num].attr = *rel_attr;
+  selects->order_attrs[selects->order_num++].is_desc = is_desc;
 }
 
 void selects_append_aggr(Selects *selects, AggrAttr *aggr_attr)
@@ -281,7 +285,7 @@ void inserts_append_values(Inserts *inserts, size_t row_num, Value values[], siz
 {
   assert(row_num < sizeof(inserts->rows) / sizeof(inserts->rows[0]));
   assert(value_num < sizeof(inserts->rows[0].values) / sizeof(inserts->rows[0].values[0]));
-  
+
   for (size_t i = 0; i < value_num; i++) {
     inserts->rows[row_num].values[i] = values[i];
   }
@@ -384,8 +388,7 @@ void drop_table_destroy(DropTable *drop_table)
   drop_table->relation_name = nullptr;
 }
 
-void create_index_init(
-    CreateIndex *create_index, const char *index_name, const char *relation_name)
+void create_index_init(CreateIndex *create_index, const char *index_name, const char *relation_name)
 {
   create_index->index_name = strdup(index_name);
   create_index->relation_name = strdup(relation_name);

@@ -43,18 +43,27 @@ public:
   {
     return tables_;
   }
+
   const std::vector<Field> &query_fields() const
   {
     return query_fields_;
   }
+
   const std::vector<Field> &aggr_fields() const
   {
     return aggr_fields_;
   }
+
+  const std::vector<Field> &order_fields() const
+  {
+    return order_fields_;
+  }
+
   FilterStmt *filter_stmt() const
   {
     return filter_stmt_;
   }
+  
   const std::vector<FilterStmt *> &join_filters() const
   {
     return join_filters_;
@@ -63,6 +72,7 @@ public:
 private:
   std::vector<Field> query_fields_;
   std::vector<Field> aggr_fields_;
+  std::vector<Field> order_fields_;
   std::vector<Table *> tables_;
   std::vector<FilterStmt *> join_filters_;
   FilterStmt *filter_stmt_ = nullptr;

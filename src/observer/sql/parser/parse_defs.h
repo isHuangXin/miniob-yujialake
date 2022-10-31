@@ -42,7 +42,7 @@ typedef enum {
 } CompOp;
 
 //属性值类型
-typedef enum { UNDEFINED, CHARS, INTS, DATES, TEXTS, FLOATS } AttrType;
+typedef enum { UNDEFINED, CHARS, INTS, DATES, TEXTS, NULLS, FLOATS } AttrType;
 
 //聚合函数类型
 typedef enum { INVALID, MAX, MIN, SUM, AVG, COUNT } AggrType;
@@ -73,6 +73,12 @@ typedef struct _Condition {
   Value right_value;   // right-hand side value if right_is_attr = FALSE
 } Condition;
 
+// order by属性结构体
+typedef struct {
+  RelAttr attr;
+  int is_desc;
+} OrderAttr;
+
 // struct of select
 typedef struct {
   size_t aggr_num;                              // Length of aggr attrs in Select clause
@@ -86,6 +92,8 @@ typedef struct {
   size_t join_num;                              // Length of inner join
   size_t join_condition_num[MAX_NUM];           // Length of conditions in inner join clause
   Condition join_conditions[MAX_NUM][MAX_NUM];  // conditions in join clause
+  size_t order_num;                             // Length of order by attr num
+  OrderAttr order_attrs[MAX_NUM];               // attr in order by clause
 } Selects;
 
 typedef struct {
@@ -122,6 +130,7 @@ typedef struct {
   char *name;     // Attribute name
   AttrType type;  // Type of attribute
   size_t length;  // Length of attribute
+  int nullable;   // Indicate if NULL is allowed
 } AttrInfo;
 
 // struct of craete_table
@@ -138,10 +147,10 @@ typedef struct {
 
 // struct of create_index
 typedef struct {
-  char *index_name;      // Index name
-  char *relation_name;   // Relation name
+  char *index_name;               // Index name
+  char *relation_name;            // Relation name
   char *attribute_name[MAX_NUM];  // Attributes name
-  int attribute_num;  // Attribute num
+  int attribute_num;              // Attribute num
 } CreateIndex;
 
 // struct of  drop_index
@@ -221,18 +230,19 @@ void relation_aggr_destroy(AggrAttr *aggr_attr);
 void value_init_integer(Value *value, int v);
 void value_init_float(Value *value, float v);
 void value_init_string(Value *value, const char *v);
-void value_init_date(Value *value, const char* v);
+void value_init_date(Value *value, const char *v);
 void value_destroy(Value *value);
 
 void condition_init(Condition *condition, CompOp comp, int left_is_attr, RelAttr *left_attr, Value *left_value,
     int right_is_attr, RelAttr *right_attr, Value *right_value);
 void condition_destroy(Condition *condition);
 
-void attr_info_init(AttrInfo *attr_info, const char *name, AttrType type, size_t length);
+void attr_info_init(AttrInfo *attr_info, const char *name, AttrType type, size_t length, int nullable);
 void attr_info_destroy(AttrInfo *attr_info);
 
 void selects_init(Selects *selects, ...);
 void selects_append_attribute(Selects *selects, RelAttr *rel_attr);
+void selects_append_order_attr(Selects *selects, RelAttr *rel_attr, int is_desc);
 void selects_append_aggr(Selects *selects, AggrAttr *aggr_attr);
 void selects_append_relation(Selects *selects, const char *relation_name);
 void selects_append_conditions(Selects *selects, Condition conditions[], size_t condition_num);
@@ -260,9 +270,8 @@ void create_table_destroy(CreateTable *create_table);
 void drop_table_init(DropTable *drop_table, const char *relation_name);
 void drop_table_destroy(DropTable *drop_table);
 
-void create_index_init(
-    CreateIndex *create_index, const char *index_name, const char *relation_name);
-  void create_index_add(CreateIndex *create_index, const char *attr_name);
+void create_index_init(CreateIndex *create_index, const char *index_name, const char *relation_name);
+void create_index_add(CreateIndex *create_index, const char *attr_name);
 void create_index_destroy(CreateIndex *create_index);
 
 void drop_index_init(DropIndex *drop_index, const char *index_name);

@@ -70,6 +70,9 @@ QUOTE            [\'\"]
 [Ff][Ll][Oo][Aa][Tt]                                 RETURN_TOKEN(FLOAT_T);
 [Dd][Aa][Tt][Ee]                                     RETURN_TOKEN(DATE_T);
 [Tt][Ee][Xx][Tt]                                     RETURN_TOKEN(TEXT_T);
+[Nn][Uu][Ll][Ll]                                     RETURN_TOKEN(NULL_T);
+[Nn][Uu][Ll][Ll][Aa][Bb][Ll][Ee]                     RETURN_TOKEN(NULLABLE);
+[Ii][Ss]                                             RETURN_TOKEN(IS);
 [Ll][Oo][Aa][Dd]                                     RETURN_TOKEN(LOAD);
 [Dd][Aa][Tt][Aa]                                     RETURN_TOKEN(DATA);
 [Ii][Nn][Ff][Ii][Ll][Ee]                             RETURN_TOKEN(INFILE);
@@ -82,6 +85,9 @@ QUOTE            [\'\"]
 [Cc][Oo][Uu][Nn][Tt]                                 RETURN_TOKEN(COUNT_T);
 [Ii][Nn][Nn][Ee][Rr]                                 RETURN_TOKEN(INNER);
 [Jj][Oo][Ii][Nn]                                     RETURN_TOKEN(JOIN);
+[Oo][Rr][Dd][Ee][Rr]                                 RETURN_TOKEN(ORDER);
+[Bb][Yy]                                             RETURN_TOKEN(BY);
+[Aa][Ss][Cc]                                         RETURN_TOKEN(ASC);
 {ID}                                                 yylval->string=strdup(yytext); RETURN_TOKEN(ID);
 "("                                                  RETURN_TOKEN(LBRACE);
 ")"                                                  RETURN_TOKEN(RBRACE);

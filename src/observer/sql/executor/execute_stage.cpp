@@ -29,6 +29,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/expr/tuple.h"
 #include "sql/operator/aggr_operator.h"
 #include "sql/operator/join_operator.h"
+#include "sql/operator/order_operator.h"
 #include "sql/operator/table_scan_operator.h"
 #include "sql/operator/index_scan_operator.h"
 #include "sql/operator/predicate_operator.h"
@@ -416,6 +417,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   SessionEvent *session_event = sql_event->session_event();
   RC rc = RC::SUCCESS;
 
+  // FROM clause
   const std::vector<Table *> &tables = select_stmt->tables();
   Operator *scan_oper = try_to_create_index_scan_operator(select_stmt->filter_stmt());
   if (nullptr == scan_oper) {
@@ -424,14 +426,21 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 
   const std::vector<FilterStmt *> join_filters = select_stmt->join_filters();
   for (int i = 1; i < tables.size(); i++) {
+    // ON clause
     FilterStmt *join_filter = i - 1 < join_filters.size() ? join_filters[i - 1] : nullptr;
     scan_oper = new JoinOperator(scan_oper, new TableScanOperator(tables[i]), join_filter);
   }
 
+  // WHERE clause
   PredicateOperator pred_oper(select_stmt->filter_stmt());
   pred_oper.add_child(scan_oper);
+  // Order by clause
+  OrderByOperator order_oper(select_stmt->order_fields());
+  order_oper.add_child(&pred_oper);
+  // Aggregation clause
   AggrOperator aggr_oper(select_stmt->aggr_fields());
-  aggr_oper.add_child(&pred_oper);
+  aggr_oper.add_child(&order_oper);
+  // SELECT clause
   ProjectOperator project_oper;
   project_oper.add_child(&aggr_oper);
 
@@ -504,7 +513,7 @@ RC ExecuteStage::do_create_table(SQLStageEvent *sql_event)
 }
 RC ExecuteStage::do_create_index(SQLStageEvent *sql_event)
 {
-  //TODO:实现multi-index
+  // TODO:实现multi-index
   SessionEvent *session_event = sql_event->session_event();
   Db *db = session_event->session()->get_current_db();
   const CreateIndex &create_index = sql_event->query()->sstr.create_index;
@@ -514,7 +523,8 @@ RC ExecuteStage::do_create_index(SQLStageEvent *sql_event)
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
-  RC rc = table->create_index(nullptr, create_index.index_name, create_index.attribute_name, create_index.attribute_num);
+  RC rc =
+      table->create_index(nullptr, create_index.index_name, create_index.attribute_name, create_index.attribute_num);
   sql_event->session_event()->set_response(rc == RC::SUCCESS ? "SUCCESS\n" : "FAILURE\n");
   return rc;
 }
@@ -554,7 +564,7 @@ RC ExecuteStage::do_show_index(SQLStageEvent *sql_event)
   for (int i = 0; i < index_num; i++) {
     // TODO:implement multi-index and unique index
     int field_num = table_meta.index(i)->fields_num();
-    for (int j = field_num-1; j >= 0; j--) {
+    for (int j = field_num - 1; j >= 0; j--) {
       ss << table_meta.name() << " | 1 | ";
       ss << table_meta.index(i)->name() << " | ";
       ss << field_num - j << " | " << table_meta.index(i)->field(j) << std::endl;

@@ -23,6 +23,7 @@ typedef struct ParserContext {
   Condition join_conditions[MAX_NUM][MAX_NUM];
   size_t join_conditions_length[MAX_NUM];
   CompOp comp;
+  int is_desc;
   AggrType aggr_t;
   char id[MAX_NUM];
   size_t row_num;
@@ -118,10 +119,15 @@ ParserContext *get_context(yyscan_t scanner)
 		AVG_T
 		SUM_T
 		COUNT_T
-
 		INNER
 		JOIN
 		TEXT_T
+		NULL_T
+		NULLABLE
+		IS
+		ORDER
+		BY
+		ASC
 
 %union {
   struct _Attr *attr;
@@ -273,28 +279,46 @@ attr_def_list:
     ;
     
 attr_def:
-    ID_get type LBRACE number RBRACE 
-		{
-			AttrInfo attribute;
-			attr_info_init(&attribute, CONTEXT->id, $2, $4);
-			create_table_append_attribute(&CONTEXT->ssql->sstr.create_table, &attribute);
-			// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name =(char*)malloc(sizeof(char));
-			// strcpy(CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name, CONTEXT->id); 
-			// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].type = $2;  
-			// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].length = $4;
-			CONTEXT->value_length++;
-		}
-    |ID_get type
-		{
-			AttrInfo attribute;
-			attr_info_init(&attribute, CONTEXT->id, $2, $2 == TEXTS ? 4096 : 4);
-			create_table_append_attribute(&CONTEXT->ssql->sstr.create_table, &attribute);
-			// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name=(char*)malloc(sizeof(char));
-			// strcpy(CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name, CONTEXT->id); 
-			// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].type=$2;  
-			// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].length=4; // default attribute length
-			CONTEXT->value_length++;
-		}
+    ID_get type LBRACE number RBRACE {
+		AttrInfo attribute;
+		attr_info_init(&attribute, CONTEXT->id, $2, $4, 0);
+		create_table_append_attribute(&CONTEXT->ssql->sstr.create_table, &attribute);
+		// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name =(char*)malloc(sizeof(char));
+		// strcpy(CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name, CONTEXT->id); 
+		// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].type = $2;  
+		// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].length = $4;
+		CONTEXT->value_length++;
+	}
+	| ID_get type LBRACE number RBRACE NULLABLE {
+		AttrInfo attribute;
+		attr_info_init(&attribute, CONTEXT->id, $2, $4, 0);
+		create_table_append_attribute(&CONTEXT->ssql->sstr.create_table, &attribute);
+		// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name =(char*)malloc(sizeof(char));
+		// strcpy(CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name, CONTEXT->id); 
+		// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].type = $2;  
+		// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].length = $4;
+		CONTEXT->value_length++;
+	}
+    | ID_get type {
+		AttrInfo attribute;
+		attr_info_init(&attribute, CONTEXT->id, $2, $2 == TEXTS ? 4096 : 4, 0);
+		create_table_append_attribute(&CONTEXT->ssql->sstr.create_table, &attribute);
+		// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name=(char*)malloc(sizeof(char));
+		// strcpy(CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name, CONTEXT->id); 
+		// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].type=$2;  
+		// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].length=4; // default attribute length
+		CONTEXT->value_length++;
+	}
+	| ID_get type NULLABLE {
+		AttrInfo attribute;
+		attr_info_init(&attribute, CONTEXT->id, $2, $2 == TEXTS ? 4096 : 4, 1);
+		create_table_append_attribute(&CONTEXT->ssql->sstr.create_table, &attribute);
+		// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name=(char*)malloc(sizeof(char));
+		// strcpy(CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name, CONTEXT->id); 
+		// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].type=$2;  
+		// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].length=4; // default attribute length
+		CONTEXT->value_length++;
+	}
     ;
 number:
 		NUMBER {$$ = $1;}
@@ -382,7 +406,7 @@ update:			/*  update 语句的语法解析树*/
 		}
     ;
 select:				/*  select 语句的语法解析树*/
-    SELECT select_attr FROM rel_name rel_list where SEMICOLON
+    SELECT select_attr FROM rel_name rel_list where order_by SEMICOLON
 		{
 			// CONTEXT->ssql->sstr.selection.relations[CONTEXT->from_length++]=$4;
 			// selects_append_relation(&CONTEXT->ssql->sstr.selection, $4);
@@ -759,7 +783,43 @@ comOp:
 	| LK { CONTEXT->comp = LIKE; }
 	| NOT LK { CONTEXT->comp = NOT_LIKE; }
     ;
+order_by:
+	/* empty */
+	| ORDER BY order_attr order_attr_list {
 
+	}
+	;
+order_attr_list:
+	/* empty */
+	| COMMA order_attr order_attr_list {
+
+	}
+	;
+order_attr:
+	ID direction {
+		RelAttr attr;
+		relation_attr_init(&attr, NULL, $1);
+		selects_append_order_attr(&CONTEXT->ssql->sstr.selection, &attr, CONTEXT->is_desc);
+		CONTEXT->is_desc = 0;
+	}
+	| ID DOT ID direction {
+		RelAttr attr;
+		relation_attr_init(&attr, $1, $3);
+		selects_append_order_attr(&CONTEXT->ssql->sstr.selection, &attr, CONTEXT->is_desc);
+		CONTEXT->is_desc = 0;
+	}
+	;
+direction:
+	/* empty */ {
+		CONTEXT->is_desc = 0;
+	}
+	| ASC {
+		CONTEXT->is_desc = 0;
+	} 
+	| DESC {
+		CONTEXT->is_desc = 1;
+	}
+	;
 load_data:
 		LOAD DATA INFILE SSS INTO TABLE ID SEMICOLON
 		{
