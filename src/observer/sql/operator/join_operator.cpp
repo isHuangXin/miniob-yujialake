@@ -107,9 +107,13 @@ bool JoinOperator::do_predicate(JoinTuple &tuple)
     left_expr->get_value(tuple, left_cell);
     right_expr->get_value(tuple, right_cell);
 
-    bool like_cmp = (comp == LIKE || comp == NOT_LIKE);
+    if (left_cell.attr_type() == NULLS || right_cell.attr_type() == NULLS) {
+      return false;
+    }
+
+    bool like_comp = (comp == LIKE || comp == NOT_LIKE);
     int compare = 1;
-    if (like_cmp) {
+    if (like_comp) {
       compare = left_cell.compare_like(right_cell);
     } else {
       compare = left_cell.compare(right_cell);

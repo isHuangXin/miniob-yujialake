@@ -71,19 +71,27 @@ void relation_aggr_destroy(AggrAttr *aggr_attr)
 void value_init_integer(Value *value, int v)
 {
   value->type = INTS;
-  value->data = malloc(sizeof(v));
+  value->data = malloc(sizeof(v) + 1);
+  memset(value->data, 0, sizeof(v) + 1);
   memcpy(value->data, &v, sizeof(v));
 }
 void value_init_float(Value *value, float v)
 {
   value->type = FLOATS;
-  value->data = malloc(sizeof(v));
+  value->data = malloc(sizeof(v) + 1);
+  memset(value->data, 0, sizeof(v) + 1);
   memcpy(value->data, &v, sizeof(v));
 }
 void value_init_string(Value *value, const char *v)
 {
   value->type = CHARS;
-  value->data = strdup(v);
+  int length = strlen(v);
+  if (length >= 4096) {
+    length = 4096;
+  }
+  value->data = malloc(length + 2);
+  memset(value->data, 0, length + 2);
+  memcpy(value->data, v, length);
 }
 
 bool is_leap(int y)
@@ -127,6 +135,13 @@ void value_init_date(Value *value, const char *v)
     dv = -1;
   }
   memcpy(value->data, &dv, sizeof(int));
+}
+
+void value_init_null(Value *value)
+{
+  value->type = NULLS;
+  value->data = malloc(sizeof(int) + 1);
+  ((char *)value->data)[4] = 1;
 }
 
 void value_destroy(Value *value)
@@ -173,7 +188,7 @@ void attr_info_init(AttrInfo *attr_info, const char *name, AttrType type, size_t
 {
   attr_info->name = strdup(name);
   attr_info->type = type;
-  attr_info->length = length;
+  attr_info->length = length + 1;
   attr_info->nullable = nullable;
 }
 void attr_info_destroy(AttrInfo *attr_info)

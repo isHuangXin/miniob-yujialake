@@ -62,10 +62,23 @@ RC InsertStmt::create(Db *db, const Inserts &inserts, Stmt *&stmt)
       const FieldMeta *field_meta = table_meta.field(j + sys_field_num);
       const AttrType field_type = field_meta->type();
       const AttrType value_type = row.values[j].type;
-      const Value &value = row.values[j];
+      const Value& value = row.values[j];
+      // 往不允许为NULL的字段插入一个NULL值
+      if (!field_meta->nullable() && value_type == NULLS) {
+        return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+      }
+
+      assert((value_type != NULLS && ((char *)value.data)[field_meta->len() - 1] != 1) ||
+             (value_type == NULLS && ((char *)value.data)[field_meta->len() - 1] == 1));
+
       // DATE 类型的日期不符合要求
-      if (value.type == DATES && *(int*)value.data == -1) {
-      return RC::INVALID_ARGUMENT;
+      if (value.type == DATES && *(int *)value.data == -1) {
+        return RC::INVALID_ARGUMENT;
+      }
+
+      // 如果插入数据为NULL类型则不需要进行类型转换
+      if (value_type == NULLS) {
+        continue;
       }
       // 按照test case，第二行数据若不匹配则插入失败
       if (i > 0 && field_type != value_type) {

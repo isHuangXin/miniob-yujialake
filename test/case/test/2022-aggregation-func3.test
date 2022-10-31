@@ -1,0 +1,7 @@
+CREATE TABLE t(a char);
+INSERT INTO t VALUES ('ww');
+INSERT INTO t VALUES ('1');
+INSERT INTO t VALUES ('2.5');
+INSERT INTO t VALUES ('ww');
+SELECT avg(a) FROM t;
+drop table t;

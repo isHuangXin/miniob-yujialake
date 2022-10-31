@@ -68,8 +68,8 @@ public:
   virtual RC find_cell(const Field &field, TupleCell &cell) const = 0;
   /**
    * @brief tuple cell index in a tuple
-   * 
-   * @param field 
+   *
+   * @param field
    * @return int index
    */
   virtual int find_cell_index(const Field &field) const = 0;
@@ -119,6 +119,10 @@ public:
     const FieldMeta *field_meta = field_expr->field().meta();
     cell.set_type(field_meta->type());
     cell.set_data(this->record_->data() + field_meta->offset());
+    // 检查标志位
+    if (this->record_->data()[field_meta->offset() + field_meta->len() - 1] == 1) {
+      cell.set_type(NULLS);
+    }
     cell.set_length(field_meta->len());
     return RC::SUCCESS;
   }

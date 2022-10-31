@@ -32,7 +32,7 @@ RC PredicateOperator::next()
 {
   RC rc = RC::SUCCESS;
   Operator *oper = children_[0];
-  
+
   while (RC::SUCCESS == (rc = oper->next())) {
     Tuple *tuple = oper->current_tuple();
     if (nullptr == tuple) {
@@ -54,7 +54,7 @@ RC PredicateOperator::close()
   return RC::SUCCESS;
 }
 
-Tuple * PredicateOperator::current_tuple()
+Tuple *PredicateOperator::current_tuple()
 {
   return children_[0]->current_tuple();
 }
@@ -74,38 +74,42 @@ bool PredicateOperator::do_predicate(RowTuple &tuple)
     left_expr->get_value(tuple, left_cell);
     right_expr->get_value(tuple, right_cell);
 
-    bool like_cmp = (comp == LIKE || comp == NOT_LIKE);
+    if (left_cell.attr_type() == NULLS || right_cell.attr_type() == NULLS) {
+      return false;
+    }
+
+    bool like_comp = (comp == LIKE || comp == NOT_LIKE);
     int compare = 1;
-    if (like_cmp) {
+    if (like_comp) {
       compare = left_cell.compare_like(right_cell);
     } else {
       compare = left_cell.compare(right_cell);
     }
     bool filter_result = false;
     switch (comp) {
-    case LIKE:
-    case EQUAL_TO: {
-      filter_result = (0 == compare); 
-    } break;
-    case LESS_EQUAL: {
-      filter_result = (compare <= 0);
-    } break;
-    case NOT_LIKE:
-    case NOT_EQUAL: {
-      filter_result = (compare != 0);
-    } break;
-    case LESS_THAN: {
-      filter_result = (compare < 0);
-    } break;
-    case GREAT_EQUAL: {
-      filter_result = (compare >= 0);
-    } break;
-    case GREAT_THAN: {
-      filter_result = (compare > 0);
-    } break;
-    default: {
-      LOG_WARN("invalid compare type: %d", comp);
-    } break;
+      case LIKE:
+      case EQUAL_TO: {
+        filter_result = (0 == compare);
+      } break;
+      case LESS_EQUAL: {
+        filter_result = (compare <= 0);
+      } break;
+      case NOT_LIKE:
+      case NOT_EQUAL: {
+        filter_result = (compare != 0);
+      } break;
+      case LESS_THAN: {
+        filter_result = (compare < 0);
+      } break;
+      case GREAT_EQUAL: {
+        filter_result = (compare >= 0);
+      } break;
+      case GREAT_THAN: {
+        filter_result = (compare > 0);
+      } break;
+      default: {
+        LOG_WARN("invalid compare type: %d", comp);
+      } break;
     }
     if (!filter_result) {
       return false;

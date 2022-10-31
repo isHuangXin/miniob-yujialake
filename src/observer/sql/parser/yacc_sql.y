@@ -291,7 +291,7 @@ attr_def:
 	}
 	| ID_get type LBRACE number RBRACE NULLABLE {
 		AttrInfo attribute;
-		attr_info_init(&attribute, CONTEXT->id, $2, $4, 0);
+		attr_info_init(&attribute, CONTEXT->id, $2, $4, 1);
 		create_table_append_attribute(&CONTEXT->ssql->sstr.create_table, &attribute);
 		// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name =(char*)malloc(sizeof(char));
 		// strcpy(CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name, CONTEXT->id); 
@@ -300,6 +300,16 @@ attr_def:
 		CONTEXT->value_length++;
 	}
     | ID_get type {
+		AttrInfo attribute;
+		attr_info_init(&attribute, CONTEXT->id, $2, $2 == TEXTS ? 4096 : 4, 0);
+		create_table_append_attribute(&CONTEXT->ssql->sstr.create_table, &attribute);
+		// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name=(char*)malloc(sizeof(char));
+		// strcpy(CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name, CONTEXT->id); 
+		// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].type=$2;  
+		// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].length=4; // default attribute length
+		CONTEXT->value_length++;
+	}
+	| ID_get type NOT NULL_T {
 		AttrInfo attribute;
 		attr_info_init(&attribute, CONTEXT->id, $2, $2 == TEXTS ? 4096 : 4, 0);
 		create_table_append_attribute(&CONTEXT->ssql->sstr.create_table, &attribute);
@@ -370,21 +380,23 @@ value_list:
 	}
     ;
 value:
-    NUMBER{	
+    NUMBER {	
   		value_init_integer(&CONTEXT->values[CONTEXT->value_length++], $1);
-		}
-    |FLOAT{
+	}
+    | FLOAT {
   		value_init_float(&CONTEXT->values[CONTEXT->value_length++], $1);
-		}
-    |SSS {
+	}
+    | SSS {
 		$1 = substr($1,1,strlen($1)-2);
   		value_init_string(&CONTEXT->values[CONTEXT->value_length++], $1);
-		}
-	|DATE_STR {
+	}
+	| DATE_STR {
         value_init_date(&CONTEXT->values[CONTEXT->value_length++], $1);
-    }
+    } 
+	| NULL_T {
+		value_init_null(&CONTEXT->values[CONTEXT->value_length++]);
+	}
     ;
-    
 delete:		/*  delete 语句的语法解析树*/
     DELETE FROM ID where SEMICOLON 
 		{
