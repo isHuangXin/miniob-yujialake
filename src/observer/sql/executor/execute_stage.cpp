@@ -555,7 +555,7 @@ RC ExecuteStage::do_show_index(SQLStageEvent *sql_event)
     // TODO:implement multi-index and unique index
     int field_num = table_meta.index(i)->fields_num();
     for (int j = field_num-1; j >= 0; j--) {
-      ss << table_meta.name() << " | 1 | ";
+      ss << table_meta.name() << " | " << 1-(table_meta.index(i)->is_unique()) << " | ";
       ss << table_meta.index(i)->name() << " | ";
       ss << field_num - j << " | " << table_meta.index(i)->field(j) << std::endl;
     }
