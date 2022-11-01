@@ -742,7 +742,7 @@ public:
 
 private:
   Table & table_;
-  Trx *trx_;
+  Trx *trx_ = nullptr;
   int updated_count_ = 0;
   const FieldMeta *fieldMeta_;
   const Value *value_;
@@ -780,6 +780,84 @@ RC Table::update_record(Trx *trx, const char *attribute_name, const Value *value
   rc = scan_record(trx, filter, -1, &updater, record_reader_update_adapter);
   *updated_count = updater.updated_count();
   return RC::SUCCESS;
+}
+
+RC Table::update_record(Trx *trx, Record *record)
+{
+  RC rc = RC::SUCCESS;
+
+  if (trx != nullptr) {
+    trx->init_trx_info(this, *record);
+  }
+
+  rc = record_handler_->update_record(record);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Update record failed. table name=%s, rc=%d:%s", table_meta_.name(), rc, strrc(rc));
+    return rc;
+  }
+
+  return rc;
+}
+
+RC Table::update_multi_record(Trx *trx, char * const *attributes, const Value *values, int attribute_num, 
+    int condition_num, const Condition conditions[], int *updated_count)
+{
+  CompositeConditionFilter condition_filter;
+  RC rc = condition_filter.init(*this, conditions, condition_num);
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
+  ConditionFilter *filter = &condition_filter;
+
+  RecordFileScanner scanner;
+  rc = scanner.open_scan(*data_buffer_pool_, &condition_filter);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("failed to open scanner. rc=%d:%s", rc, strrc(rc));
+  }
+
+  // check attrs name & types
+  std::vector<const FieldMeta*> fields;
+  for (int i = 0; i < attribute_num; i++) {
+    if (table_meta_.field(attributes[i]) == nullptr) {
+      return RC::SCHEMA_FIELD_NOT_EXIST;
+    }
+    
+    if (table_meta_.field(attributes[i])->type() != values[i].type) {
+      if (table_meta_.field(attributes[i])->type() == TEXTS && values[i].type == CHARS) {
+      }
+      else {
+        return RC::SCHEMA_FIELD_NOT_EXIST;
+      }
+    }
+    fields.push_back(table_meta_.field(attributes[i]));
+  }
+  
+  *updated_count = 0;
+  Record record;
+  while (scanner.has_next()) {
+    rc = scanner.next(record);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to fetch next record. rc=%d:%s", rc, strrc(rc));
+      return rc;
+    }
+    
+    if (trx == nullptr || trx->is_visible(this, &record)) {
+       for (int i = 0; i < attribute_num; i++) {
+          // prepare data
+          size_t copy_len = fields[i]->len();
+          memcpy(record.data() + fields[i]->offset(), values[i].data, copy_len);
+
+          // update
+          rc = update_record(trx, &record);
+          if (rc != RC::SUCCESS) {
+          LOG_WARN("failed to update");
+          return rc;
+        }
+       }
+    }
+  }
+  scanner.close_scan();
+  return rc;
 }
 
 RC Table::update_record_one_attr(Trx *trx, Record *record, const FieldMeta *fieldMeta, const Value *value) {

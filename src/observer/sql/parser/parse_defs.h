@@ -42,7 +42,7 @@ typedef enum {
 } CompOp;
 
 //属性值类型
-typedef enum { UNDEFINED, CHARS, INTS, DATES, TEXTS, FLOATS } AttrType;
+typedef enum { UNDEFINED, CHARS, INTS, DATES, TEXTS, FLOATS }  AttrType;
 
 //聚合函数类型
 typedef enum { INVALID, MAX, MIN, SUM, AVG, COUNT } AggrType;
@@ -112,8 +112,9 @@ typedef struct {
 // struct of update
 typedef struct {
   char *relation_name;            // Relation to update
-  char *attribute_name;           // Attribute to update
-  Value value;                    // update value
+  size_t attribute_num;           // Length of updated attrs
+  char *attributes[MAX_NUM];      // Attribute to update
+  Value values[MAX_NUM];          // update value
   size_t condition_num;           // Length of conditions in Where clause
   Condition conditions[MAX_NUM];  // conditions in Where clause
 } Updates;
@@ -250,9 +251,11 @@ void deletes_init_relation(Deletes *deletes, const char *relation_name);
 void deletes_set_conditions(Deletes *deletes, Condition conditions[], size_t condition_num);
 void deletes_destroy(Deletes *deletes);
 
-void updates_init(Updates *updates, const char *relation_name, const char *attribute_name, Value *value,
-    Condition conditions[], size_t condition_num);
+// void updates_init(Updates *updates, const char *relation_name, const char *attribute_name, Value *value,
+    // Condition conditions[], size_t condition_num);
+void updates_init(Updates *updates, const char *relation_name, Condition conditions[], size_t condition_num);
 void updates_destroy(Updates *updates);
+void updates_append(Updates *updates, const char *attribute_name, Value *value);
 
 void create_table_append_attribute(CreateTable *create_table, AttrInfo *attr_info);
 void create_table_init_name(CreateTable *create_table, const char *relation_name);

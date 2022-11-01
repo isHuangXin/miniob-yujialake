@@ -34,6 +34,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/predicate_operator.h"
 #include "sql/operator/delete_operator.h"
 #include "sql/operator/project_operator.h"
+#include "sql/parser/parse_defs.h"
 #include "sql/stmt/stmt.h"
 #include "sql/stmt/select_stmt.h"
 #include "sql/stmt/update_stmt.h"
@@ -656,6 +657,8 @@ RC ExecuteStage::do_update(SQLStageEvent *sql_event)
   Session *session = session_event->session();
   Db *db = session->get_current_db();
   Trx *trx = nullptr;
+  // Trx *trx = session->current_trx();
+  // Trx *trx = new Trx();
   CLogManager *clog_manager = db->get_clog_manager();
 
   if (stmt == nullptr) {
@@ -667,11 +670,12 @@ RC ExecuteStage::do_update(SQLStageEvent *sql_event)
   Table *table = update_stmt->table();
 
   const Updates &updates = sql_event->query()->sstr.update;
-  const char *table_name = updates.relation_name;
-  const char *field_name = updates.attribute_name;
-  int updated_count = 0;
-  RC rc =
-      table->update_record(trx, field_name, &updates.value, updates.condition_num, updates.conditions, &updated_count);
+  // const char *table_name = updates.relation_name;
+  // int updated_count = 0;
+  // RC rc =
+  //     table->update_record(trx, updates.attributes[0], updates.values, updates.condition_num, updates.conditions, &updated_count);
+  RC rc = db->update_table(updates.relation_name, updates.attributes, updates.values,
+                          updates.attribute_num, updates.condition_num, updates.conditions);
   if (rc != RC::SUCCESS) {
     session_event->set_response("FAILURE\n");
   } else {

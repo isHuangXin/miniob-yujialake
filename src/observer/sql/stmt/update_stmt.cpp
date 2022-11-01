@@ -42,8 +42,9 @@ RC UpdateStmt::create(Db *db, const Updates &update, Stmt *&stmt)
   table_map.insert(std::pair<std::string, Table *>(std::string(table_name), table));
 
   // check the fields number
-  Value* value = const_cast<Value *>(&update.value);
-  int value_amount = 1;
+  // Value *value = const_cast<Value *>(&update.value);
+  Value *values = const_cast<Value *>(update.values);
+  int value_amount = update.attribute_num;
 
   // create filter statement in `where` statement
   FilterStmt *filter_stmt = nullptr;
@@ -54,6 +55,6 @@ RC UpdateStmt::create(Db *db, const Updates &update, Stmt *&stmt)
     return rc;
   }
 
-  stmt = new UpdateStmt(table, value, value_amount);
+  stmt = new UpdateStmt(table, values, value_amount);
   return rc;
 }
