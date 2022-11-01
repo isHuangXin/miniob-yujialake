@@ -852,7 +852,7 @@ RC Table::update_multi_record(Trx *trx, char * const *attributes, const Value *v
           
           Record temp_record = record;
           temp_record.set_data((char*)malloc(sizeof(record.data())));
-
+          memcpy(temp_record.data(), record.data(), sizeof(record.data()));
           /*判断是否可以更新*/
           rc = delete_entry_of_indexes(temp_record.data(), temp_record.rid(), false);
           if (rc != RC::SUCCESS) {
@@ -882,7 +882,7 @@ RC Table::update_multi_record(Trx *trx, char * const *attributes, const Value *v
             free(temp_record.data());
             return rc;
           }
-
+          free(temp_record.data());
 
           // prepare data
           // size_t copy_len = fields[i]->len();
