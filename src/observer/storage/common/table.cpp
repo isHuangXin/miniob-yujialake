@@ -790,6 +790,9 @@ RC Table::update_record(Trx *trx, Record *record)
     trx->init_trx_info(this, *record);
   }
 
+
+
+
   rc = record_handler_->update_record(record);
   if (rc != RC::SUCCESS) {
     LOG_ERROR("Update record failed. table name=%s, rc=%d:%s", table_meta_.name(), rc, strrc(rc));
@@ -834,6 +837,9 @@ RC Table::update_multi_record(Trx *trx, char * const *attributes, const Value *v
   
   *updated_count = 0;
   Record record;
+  // std::vector<Record> records_updated;  //保存已经完成更新的records
+  // 1. 如果update的行超过1行且是关于唯一索引的操作，则不允许
+  // 2. 如果删除索引之后再进行添加失败，则将刚刚的删除复原，所以得保留原来的数据。
   while (scanner.has_next()) {
     rc = scanner.next(record);
     if (rc != RC::SUCCESS) {
@@ -843,16 +849,53 @@ RC Table::update_multi_record(Trx *trx, char * const *attributes, const Value *v
     
     if (trx == nullptr || trx->is_visible(this, &record)) {
        for (int i = 0; i < attribute_num; i++) {
-          // prepare data
+          
+          Record temp_record = record;
+          temp_record.set_data((char*)malloc(sizeof(record.data())));
+
+          /*判断是否可以更新*/
+          rc = delete_entry_of_indexes(temp_record.data(), temp_record.rid(), false);
+          if (rc != RC::SUCCESS) {
+            // LOG_ERROR("Failed to update phase 1 indexes of record (rid=%d.%d). rc=%d:%s",
+                      // record->rid().page_num, record->rid().slot_num, rc, strrc(rc));
+            return rc;
+          }
+          // modify temp data
           size_t copy_len = fields[i]->len();
+          memcpy(temp_record.data() + fields[i]->offset(), values[i].data, copy_len);
+
+          // return RC::RECORD_DUPLICATE_KEY;
+          rc = insert_entry_of_indexes(temp_record.data(), temp_record.rid());
+          if (rc != RC::SUCCESS) {
+            if (rc == RC::RECORD_DUPLICATE_KEY) {
+              // return rc;
+              ;
+            } else {
+              RC rc2 = delete_entry_of_indexes(record.data(), record.rid(), true);
+              if (rc2 != RC::SUCCESS) {
+                LOG_ERROR("Failed to rollback index data when insert index entries failed. table name=%s, rc=%d:%s",
+                    name(),
+                    rc2,
+                    strrc(rc2));
+              }
+            }
+            free(temp_record.data());
+            return rc;
+          }
+
+
+          // prepare data
+          // size_t copy_len = fields[i]->len();
           memcpy(record.data() + fields[i]->offset(), values[i].data, copy_len);
+
+
 
           // update
           rc = update_record(trx, &record);
           if (rc != RC::SUCCESS) {
-          LOG_WARN("failed to update");
-          return rc;
-        }
+            LOG_WARN("failed to update");
+            return rc;
+          }
        }
     }
   }
