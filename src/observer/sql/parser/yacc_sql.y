@@ -75,6 +75,7 @@ ParserContext *get_context(yyscan_t scanner)
         DROP
         TABLE
         TABLES
+		UNIQUE
         INDEX
         SELECT
         DESC
@@ -239,8 +240,14 @@ create_index:		/*create index 语句的语法解析树*/
     CREATE INDEX ID ON ID LBRACE ID id_list RBRACE SEMICOLON 
 		{
 			CONTEXT->ssql->flag = SCF_CREATE_INDEX;//"create_index";
-			create_index_init(&CONTEXT->ssql->sstr.create_index, $3, $5);
+			create_index_init(&CONTEXT->ssql->sstr.create_index, $3, $5, 0);
 			create_index_add(&CONTEXT->ssql->sstr.create_index, $7);
+		}
+	| CREATE UNIQUE INDEX ID ON ID LBRACE ID id_list RBRACE SEMICOLON
+		{
+			CONTEXT->ssql->flag = SCF_CREATE_INDEX;
+			create_index_init(&CONTEXT->ssql->sstr.create_index, $4, $6, 1);
+			create_index_add(&CONTEXT->ssql->sstr.create_index, $8);
 		}
     ;
 id_list:
@@ -408,15 +415,38 @@ delete:		/*  delete 语句的语法解析树*/
     }
     ;
 update:			/*  update 语句的语法解析树*/
-    UPDATE ID SET ID EQ value where SEMICOLON
+    // UPDATE ID SET ID EQ value where SEMICOLON
+	// 	{
+	// 		CONTEXT->ssql->flag = SCF_UPDATE;//"update";
+	// 		Value *value = &CONTEXT->values[0];
+	// 		updates_init(&CONTEXT->ssql->sstr.update, $2, $4, value, 
+	// 				CONTEXT->conditions, CONTEXT->condition_length);
+	// 		CONTEXT->condition_length = 0;
+	// 	}
+    // ;
+
+	UPDATE ID SET update_set updates_sets where SEMICOLON
 		{
-			CONTEXT->ssql->flag = SCF_UPDATE;//"update";
-			Value *value = &CONTEXT->values[0];
-			updates_init(&CONTEXT->ssql->sstr.update, $2, $4, value, 
-					CONTEXT->conditions, CONTEXT->condition_length);
-			CONTEXT->condition_length = 0;
+  			CONTEXT->ssql->flag = SCF_UPDATE;//"update";
+  			updates_init(&CONTEXT->ssql->sstr.update, $2, 
+						 CONTEXT->conditions, CONTEXT->condition_length);
+  			CONTEXT->condition_length = 0;
+  			CONTEXT->value_length = 0;
 		}
-    ;
+	;
+
+update_set:
+	ID EQ value {
+		updates_append(&CONTEXT->ssql->sstr.update, $1, &CONTEXT->values[CONTEXT->value_length - 1]);
+	}
+	;
+
+updates_sets:
+	| COMMA update_set updates_sets {
+	
+	}
+	;
+
 select:				/*  select 语句的语法解析树*/
     SELECT select_attr FROM rel_name rel_list where order_by SEMICOLON
 		{

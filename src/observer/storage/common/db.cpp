@@ -110,6 +110,26 @@ RC Db::drop_table(const char *table_name)
   return RC::SUCCESS;
 }
 
+RC Db::update_table(const char *relation_name, char * const *attributes, const Value *value,
+                    const size_t attr_num, const size_t condition_num, const Condition *conditions)
+{
+  RC rc = RC::SUCCESS;
+  if (opened_tables_.count(relation_name) == 0) {
+    LOG_WARN("there is no table %s", relation_name);
+    return RC::SCHEMA_TABLE_NOT_EXIST;
+  }
+
+  Table *table = opened_tables_[relation_name];
+  int updated_cnt;
+  rc = table->update_multi_record(nullptr, attributes, value, attr_num, condition_num, conditions, &updated_cnt);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to update table %s", relation_name);
+    return rc;
+  }
+  LOG_INFO("Update table success. table name=%s", relation_name);
+  return rc;
+}
+
 Table *Db::find_table(const char *table_name) const
 {
   std::unordered_map<std::string, Table *>::const_iterator iter;

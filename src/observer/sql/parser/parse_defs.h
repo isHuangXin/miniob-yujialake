@@ -120,8 +120,9 @@ typedef struct {
 // struct of update
 typedef struct {
   char *relation_name;            // Relation to update
-  char *attribute_name;           // Attribute to update
-  Value value;                    // update value
+  size_t attribute_num;           // Length of updated attrs
+  char *attributes[MAX_NUM];      // Attribute to update
+  Value values[MAX_NUM];          // update value
   size_t condition_num;           // Length of conditions in Where clause
   Condition conditions[MAX_NUM];  // conditions in Where clause
 } Updates;
@@ -150,7 +151,8 @@ typedef struct {
   char *index_name;               // Index name
   char *relation_name;            // Relation name
   char *attribute_name[MAX_NUM];  // Attributes name
-  int attribute_num;              // Attribute num
+  int attribute_num;  // Attribute num
+  int is_unique;
 } CreateIndex;
 
 // struct of  drop_index
@@ -260,9 +262,11 @@ void deletes_init_relation(Deletes *deletes, const char *relation_name);
 void deletes_set_conditions(Deletes *deletes, Condition conditions[], size_t condition_num);
 void deletes_destroy(Deletes *deletes);
 
-void updates_init(Updates *updates, const char *relation_name, const char *attribute_name, Value *value,
-    Condition conditions[], size_t condition_num);
+// void updates_init(Updates *updates, const char *relation_name, const char *attribute_name, Value *value,
+    // Condition conditions[], size_t condition_num);
+void updates_init(Updates *updates, const char *relation_name, Condition conditions[], size_t condition_num);
 void updates_destroy(Updates *updates);
+void updates_append(Updates *updates, const char *attribute_name, Value *value);
 
 void create_table_append_attribute(CreateTable *create_table, AttrInfo *attr_info);
 void create_table_init_name(CreateTable *create_table, const char *relation_name);
@@ -271,8 +275,9 @@ void create_table_destroy(CreateTable *create_table);
 void drop_table_init(DropTable *drop_table, const char *relation_name);
 void drop_table_destroy(DropTable *drop_table);
 
-void create_index_init(CreateIndex *create_index, const char *index_name, const char *relation_name);
-void create_index_add(CreateIndex *create_index, const char *attr_name);
+void create_index_init(
+    CreateIndex *create_index, const char *index_name, const char *relation_name, int is_unique);
+  void create_index_add(CreateIndex *create_index, const char *attr_name);
 void create_index_destroy(CreateIndex *create_index);
 
 void drop_index_init(DropIndex *drop_index, const char *index_name);

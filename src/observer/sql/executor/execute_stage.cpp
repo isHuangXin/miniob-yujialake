@@ -35,6 +35,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/predicate_operator.h"
 #include "sql/operator/delete_operator.h"
 #include "sql/operator/project_operator.h"
+#include "sql/parser/parse_defs.h"
 #include "sql/stmt/stmt.h"
 #include "sql/stmt/select_stmt.h"
 #include "sql/stmt/update_stmt.h"
@@ -523,8 +524,7 @@ RC ExecuteStage::do_create_index(SQLStageEvent *sql_event)
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
-  RC rc =
-      table->create_index(nullptr, create_index.index_name, create_index.attribute_name, create_index.attribute_num);
+  RC rc = table->create_index(nullptr, create_index.index_name, create_index.attribute_name, create_index.attribute_num, create_index.is_unique);
   sql_event->session_event()->set_response(rc == RC::SUCCESS ? "SUCCESS\n" : "FAILURE\n");
   return rc;
 }
@@ -564,8 +564,8 @@ RC ExecuteStage::do_show_index(SQLStageEvent *sql_event)
   for (int i = 0; i < index_num; i++) {
     // TODO:implement multi-index and unique index
     int field_num = table_meta.index(i)->fields_num();
-    for (int j = field_num - 1; j >= 0; j--) {
-      ss << table_meta.name() << " | 1 | ";
+    for (int j = field_num-1; j >= 0; j--) {
+      ss << table_meta.name() << " | " << 1-(table_meta.index(i)->is_unique()) << " | ";
       ss << table_meta.index(i)->name() << " | ";
       ss << field_num - j << " | " << table_meta.index(i)->field(j) << std::endl;
     }
@@ -666,6 +666,8 @@ RC ExecuteStage::do_update(SQLStageEvent *sql_event)
   Session *session = session_event->session();
   Db *db = session->get_current_db();
   Trx *trx = nullptr;
+  // Trx *trx = session->current_trx();
+  // Trx *trx = new Trx();
   CLogManager *clog_manager = db->get_clog_manager();
 
   if (stmt == nullptr) {
@@ -677,11 +679,12 @@ RC ExecuteStage::do_update(SQLStageEvent *sql_event)
   Table *table = update_stmt->table();
 
   const Updates &updates = sql_event->query()->sstr.update;
-  const char *table_name = updates.relation_name;
-  const char *field_name = updates.attribute_name;
-  int updated_count = 0;
-  RC rc =
-      table->update_record(trx, field_name, &updates.value, updates.condition_num, updates.conditions, &updated_count);
+  // const char *table_name = updates.relation_name;
+  // int updated_count = 0;
+  // RC rc =
+  //     table->update_record(trx, updates.attributes[0], updates.values, updates.condition_num, updates.conditions, &updated_count);
+  RC rc = db->update_table(updates.relation_name, updates.attributes, updates.values,
+                          updates.attribute_num, updates.condition_num, updates.conditions);
   if (rc != RC::SUCCESS) {
     session_event->set_response("FAILURE\n");
   } else {

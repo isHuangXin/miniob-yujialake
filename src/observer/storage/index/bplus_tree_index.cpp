@@ -90,6 +90,27 @@ RC BplusTreeIndex::close()
 
 RC BplusTreeIndex::insert_entry(const char *record, const RID *rid)
 {
+  // 唯一索引插入值时不允许成功
+  if (unique_) {
+    // IndexScanner *scanner = create_scanner(CompOp::EQUAL_TO, record + field_meta_.offset());
+    int left_len = 4;
+    int right_len = 4;
+    const char* target_val = record + field_meta_.offset();
+    if (field_meta_.type() == CHARS) {
+      left_len = strlen(target_val);
+      right_len = strlen(target_val);
+    }
+    RC rc;
+    RID temp_rid;
+    IndexScanner *scanner = create_scanner(target_val, left_len, true, target_val, right_len, true);
+    if (scanner != nullptr) {
+      rc = scanner->next_entry(&temp_rid);
+      if (rc == RC::SUCCESS) {
+        scanner->destroy();
+        return RC::RECORD_DUPLICATE_KEY;
+      }
+    }
+  }
   return index_handler_.insert_entry(record + field_meta_.offset(), rid);
 }
 

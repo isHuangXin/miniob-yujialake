@@ -273,18 +273,20 @@ RC Table::insert_record(Trx *trx, Record *record)
   if (trx != nullptr) {
     trx->init_trx_info(this, *record);
   }
+  // 下面是第1个插入
   rc = record_handler_->insert_record(record->data(), table_meta_.record_size(), &record->rid());
   if (rc != RC::SUCCESS) {
     LOG_ERROR("Insert record failed. table name=%s, rc=%d:%s", table_meta_.name(), rc, strrc(rc));
     return rc;
   }
-
+  // 下面是第二个插入
+  // 所以和上面的插入的区别是啥？
+  // 下面这个好像只是对trx的日志进行记录
   if (trx != nullptr) {
     rc = trx->insert_record(this, record);
     if (rc != RC::SUCCESS) {
       LOG_ERROR("Failed to log operation(insertion) to trx");
-
-      RC rc2 = record_handler_->delete_record(&record->rid());
+      RC rc2 = trx->delete_record(this, record);
       if (rc2 != RC::SUCCESS) {
         LOG_ERROR("Failed to rollback record data when insert index entries failed. table name=%s, rc=%d:%s",
             name(),
@@ -297,20 +299,37 @@ RC Table::insert_record(Trx *trx, Record *record)
 
   rc = insert_entry_of_indexes(record->data(), record->rid());
   if (rc != RC::SUCCESS) {
-    RC rc2 = delete_entry_of_indexes(record->data(), record->rid(), true);
-    if (rc2 != RC::SUCCESS) {
-      LOG_ERROR("Failed to rollback index data when insert index entries failed. table name=%s, rc=%d:%s",
-          name(),
-          rc2,
-          strrc(rc2));
+    if (rc == RC::RECORD_DUPLICATE_KEY) {
+      RC rc2 = record_handler_->delete_record(&record->rid());
+      if (rc2 != RC::SUCCESS) {
+        LOG_PANIC("Failed to rollback record data when insert index entries failed. table name=%s, rc=%d:%s",
+            name(),
+            rc2,
+            strrc(rc2));
+      }
+      if (trx != nullptr) {
+        rc2 = trx->delete_record(this, record);
+        if (rc2 != RC::SUCCESS) {
+          LOG_ERROR("Failed to log operation(insertion) to trx");
+        }
+      }
+    } else {
+      RC rc2 = delete_entry_of_indexes(record->data(), record->rid(), true);
+      if (rc2 != RC::SUCCESS) {
+        LOG_ERROR("Failed to rollback index data when insert index entries failed. table name=%s, rc=%d:%s",
+            name(),
+            rc2,
+            strrc(rc2));
+      }
+      rc2 = record_handler_->delete_record(&record->rid());
+      if (rc2 != RC::SUCCESS) {
+        LOG_PANIC("Failed to rollback record data when insert index entries failed. table name=%s, rc=%d:%s",
+            name(),
+            rc2,
+            strrc(rc2));
+      }
     }
-    rc2 = record_handler_->delete_record(&record->rid());
-    if (rc2 != RC::SUCCESS) {
-      LOG_PANIC("Failed to rollback record data when insert index entries failed. table name=%s, rc=%d:%s",
-          name(),
-          rc2,
-          strrc(rc2));
-    }
+
     return rc;
   }
 
@@ -592,7 +611,7 @@ static RC insert_index_record_reader_adapter(Record *record, void *context)
   return inserter.insert_index(record);
 }
 
-RC Table::create_index(Trx *trx, const char *index_name, char *const *attribute_name, int attribute_num)
+RC Table::create_index(Trx *trx, const char *index_name, char* const* attribute_name, int attribute_num, int is_unique)
 {
   // TODO:multi-index
   if (common::is_blank(index_name)) {
@@ -632,7 +651,7 @@ RC Table::create_index(Trx *trx, const char *index_name, char *const *attribute_
   // }
 
   IndexMeta new_index_meta;
-  RC rc = new_index_meta.init(index_name, fields_meta);
+  RC rc = new_index_meta.init(index_name, fields_meta, is_unique);
   if (rc != RC::SUCCESS) {
     // LOG_INFO("Failed to init IndexMeta in table:%s, index_name:%s, field_name:%s",
     //          name(), index_name, attribute_name);
@@ -640,7 +659,7 @@ RC Table::create_index(Trx *trx, const char *index_name, char *const *attribute_
   }
 
   // 创建索引相关数据
-  BplusTreeIndex *index = new BplusTreeIndex();
+  BplusTreeIndex *index = new BplusTreeIndex(is_unique);
   std::string index_file = table_index_file(base_dir_.c_str(), name(), index_name);
   rc = index->create(index_file.c_str(), new_index_meta, *(fields_meta[0]));  // not implemented yet
   if (rc != RC::SUCCESS) {
@@ -767,8 +786,124 @@ RC Table::update_record(Trx *trx, const char *attribute_name, const Value *value
   return RC::SUCCESS;
 }
 
-RC Table::update_record_one_attr(Trx *trx, Record *record, const FieldMeta *fieldMeta, const Value *value)
+RC Table::update_record(Trx *trx, Record *record)
 {
+  RC rc = RC::SUCCESS;
+
+  if (trx != nullptr) {
+    trx->init_trx_info(this, *record);
+  }
+
+
+
+
+  rc = record_handler_->update_record(record);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Update record failed. table name=%s, rc=%d:%s", table_meta_.name(), rc, strrc(rc));
+    return rc;
+  }
+
+  return rc;
+}
+
+RC Table::update_multi_record(Trx *trx, char * const *attributes, const Value *values, int attribute_num, 
+    int condition_num, const Condition conditions[], int *updated_count)
+{
+  CompositeConditionFilter condition_filter;
+  RC rc = condition_filter.init(*this, conditions, condition_num);
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
+  ConditionFilter *filter = &condition_filter;
+
+  RecordFileScanner scanner;
+  rc = scanner.open_scan(*data_buffer_pool_, &condition_filter);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("failed to open scanner. rc=%d:%s", rc, strrc(rc));
+  }
+
+  // check attrs name & types
+  std::vector<const FieldMeta*> fields;
+  for (int i = 0; i < attribute_num; i++) {
+    if (table_meta_.field(attributes[i]) == nullptr) {
+      return RC::SCHEMA_FIELD_NOT_EXIST;
+    }
+    
+    if (table_meta_.field(attributes[i])->type() != values[i].type) {
+      if (table_meta_.field(attributes[i])->type() == TEXTS && values[i].type == CHARS) {
+      }
+      else {
+        return RC::SCHEMA_FIELD_NOT_EXIST;
+      }
+    }
+    fields.push_back(table_meta_.field(attributes[i]));
+  }
+  
+  *updated_count = 0;
+  Record record;
+  // std::vector<Record> records_updated;  //保存已经完成更新的records
+  // 1. 如果update的行超过1行且是关于唯一索引的操作，则不允许
+  // 2. 如果删除索引之后再进行添加失败，则将刚刚的删除复原，所以得保留原来的数据。
+
+
+  while (scanner.has_next()) {
+    rc = scanner.next(record);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to fetch next record. rc=%d:%s", rc, strrc(rc));
+      return rc;
+    }
+    
+    if (trx == nullptr || trx->is_visible(this, &record)) {
+      Record temp_record = record;
+      temp_record.set_data((char*)malloc(table_meta_.record_size()));
+      memcpy(temp_record.data(), record.data(), table_meta_.record_size());
+      /*判断是否可以更新*/
+      rc = delete_entry_of_indexes(record.data(), record.rid(), false);
+      if (rc != RC::SUCCESS) {
+        // LOG_ERROR("Failed to update phase 1 indexes of record (rid=%d.%d). rc=%d:%s",
+                  // record->rid().page_num, record->rid().slot_num, rc, strrc(rc));
+        return rc;
+      }
+      for (int i = 0; i < attribute_num; i++) {
+         // modify temp data
+         size_t copy_len = fields[i]->len();
+         memcpy(temp_record.data() + fields[i]->offset(), values[i].data, copy_len);
+         // prepare data
+         // size_t copy_len = fields[i]->len();
+        //  memcpy(record.data() + fields[i]->offset(), values[i].data, copy_len);
+      }
+      // return RC::RECORD_DUPLICATE_KEY;
+      rc = insert_entry_of_indexes(temp_record.data(), temp_record.rid());
+      if (rc != RC::SUCCESS) {
+        if (rc == RC::RECORD_DUPLICATE_KEY) {
+          // return rc;
+          ;
+        } else {
+          RC rc2 = delete_entry_of_indexes(record.data(), record.rid(), true);
+          if (rc2 != RC::SUCCESS) {
+            LOG_ERROR("Failed to rollback index data when insert index entries failed. table name=%s, rc=%d:%s",
+                name(),
+                rc2,
+                strrc(rc2));
+          }
+        }
+        free(temp_record.data());
+        return rc;
+      }
+      // update
+      rc = update_record(trx, &temp_record);
+      free(temp_record.data());
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("failed to update");
+        return rc;
+      }
+    }
+  }
+  scanner.close_scan();
+  return rc;
+}
+
+RC Table::update_record_one_attr(Trx *trx, Record *record, const FieldMeta *fieldMeta, const Value *value) {
   RC rc = RC::SUCCESS;
   // 这里不考虑事务，直接原地修改
   // index应该是多余的，先保留

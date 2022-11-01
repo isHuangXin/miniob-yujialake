@@ -27,7 +27,7 @@ const static Json::StaticString FIELDS_NAME("fields_name");
 const static Json::StaticString FIELD_NAME("field_name");
 
 // RC IndexMeta::init(const char *name, const FieldMeta &field)
-RC IndexMeta::init(const char *name, std::vector<const FieldMeta *> fields)
+RC IndexMeta::init(const char *name, std::vector<const FieldMeta *> fields, int is_unique)
 {
   if (common::is_blank(name)) {
     LOG_ERROR("Failed to init index, name is empty.");
@@ -35,6 +35,7 @@ RC IndexMeta::init(const char *name, std::vector<const FieldMeta *> fields)
   }
 
   name_ = name;
+  unique_ = is_unique;
   field_num_ = fields.size();
   for (int i = 0; i < field_num_; i++) {
     fields_.push_back(fields[i]->name());
@@ -42,6 +43,11 @@ RC IndexMeta::init(const char *name, std::vector<const FieldMeta *> fields)
   }
   // field_ = field.name();
   return RC::SUCCESS;
+}
+
+int IndexMeta::is_unique() const
+{
+  return unique_;
 }
 
 void IndexMeta::to_json(Json::Value &json_value) const
@@ -94,7 +100,7 @@ RC IndexMeta::from_json(const TableMeta &table, const Json::Value &json_value, I
   }
 
 
-  return index.init(name_value.asCString(), fields);
+  return index.init(name_value.asCString(), fields, index.is_unique());
 }
 
 const char *IndexMeta::name() const
