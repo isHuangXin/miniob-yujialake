@@ -677,6 +677,8 @@ RC ExecuteStage::check_updates_data(Db *db, Updates &updates)
       Stmt *stmt = nullptr;
       value->select->aggr_num=0;  // 临时特殊处理一下
       RC rc = SelectStmt::create(db, *value->select, stmt);
+      updates.relation_name = new char[sizeof(table_name)];
+      memcpy(updates.relation_name, table_name, sizeof(table_name));
       if (rc != RC::SUCCESS) {
         return rc;
       }
@@ -724,6 +726,17 @@ RC ExecuteStage::check_updates_data(Db *db, Updates &updates)
         }
         // copy tuple to value
         // TODO : 
+        TupleCell cell;
+        for (int i = 0; i < tuple->cell_num(); i++) {
+          rc = tuple->cell_at(i, cell);
+          if (rc != RC::SUCCESS) {
+            LOG_WARN("failed to fetch field of cell. index=%d, rc=%s", i, strrc(rc));
+            break;
+          }
+          value->type = cell.attr_type();
+          value->data = new char[cell.length()];
+          memcpy(value->data, cell.data(), cell.length());
+        }
       }
 
       if (rc != RC::RECORD_EOF) {
@@ -757,7 +770,6 @@ RC ExecuteStage::do_update(SQLStageEvent *sql_event)
   Updates &updates = sql_event->query()->sstr.update;
   // for get update_select value
   RC rc = check_updates_data(db, updates);
-  return RC::INVALID_ARGUMENT;
   // const char *table_name = updates.relation_name;
   // int updated_count = 0;
   // RC rc =
