@@ -794,9 +794,6 @@ RC Table::update_record(Trx *trx, Record *record)
     trx->init_trx_info(this, *record);
   }
 
-
-
-
   rc = record_handler_->update_record(record);
   if (rc != RC::SUCCESS) {
     LOG_ERROR("Update record failed. table name=%s, rc=%d:%s", table_meta_.name(), rc, strrc(rc));
@@ -814,7 +811,6 @@ RC Table::update_multi_record(Trx *trx, char * const *attributes, const Value *v
   if (rc != RC::SUCCESS) {
     return rc;
   }
-  ConditionFilter *filter = &condition_filter;
 
   RecordFileScanner scanner;
   rc = scanner.open_scan(*data_buffer_pool_, &condition_filter);
@@ -835,6 +831,11 @@ RC Table::update_multi_record(Trx *trx, char * const *attributes, const Value *v
       else {
         return RC::SCHEMA_FIELD_NOT_EXIST;
       }
+    }
+
+    // 检测更新的 DATE 数据类型是否符合要求
+    if (table_meta_.field(attributes[i])->type() == DATES && values[i].type == DATES && *(int *)values[i].data == -1) {
+        return RC::INVALID_ARGUMENT;
     }
     fields.push_back(table_meta_.field(attributes[i]));
   }

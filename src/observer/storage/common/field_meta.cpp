@@ -25,7 +25,7 @@ const static Json::StaticString FIELD_LEN("len");
 const static Json::StaticString FIELD_VISIBLE("visible");
 const static Json::StaticString FIELD_NULLABLE("nullable");
 
-const char *ATTR_TYPE_NAME[] = {"undefined", "chars", "ints", "dates", "texts", "nulls", "floats"};
+const char *ATTR_TYPE_NAME[] = {"undefined", "chars", "ints", "dates", "texts", "nulls", "selects", "floats"};
 
 const char *attr_type_to_string(AttrType type)
 {

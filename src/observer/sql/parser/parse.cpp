@@ -144,6 +144,13 @@ void value_init_null(Value *value)
   ((char *)value->data)[4] = 1;
 }
 
+void value_init_select(Value *value, Selects *selects)
+{
+  value->type = SELECTS;
+  value->select = selects;
+  value->data = nullptr;
+}
+
 void value_destroy(Value *value)
 {
   value->type = UNDEFINED;

@@ -60,7 +60,7 @@ public:
   RC insert_record(Trx *trx, int value_num, const Value *values);
   RC update_record(Trx *trx, const char *attribute_name, const Value *value, int condition_num,
       const Condition conditions[], int *updated_count);
-
+      
   RC update_record(Trx *trx, Record *record);
   RC update_multi_record(Trx *trx, char * const *attributes, const Value *value, int attribute_num, 
     int condition_num, const Condition conditions[], int *updated_count);

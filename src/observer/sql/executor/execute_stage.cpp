@@ -659,6 +659,85 @@ RC ExecuteStage::do_insert(SQLStageEvent *sql_event)
   return rc;
 }
 
+RC ExecuteStage::check_updates_data(Db *db, Updates &updates) 
+{ 
+  const char *table_name = updates.relation_name;
+  Table *table = db->find_table(table_name);
+  const TableMeta &meta = table->table_meta();
+  if (table == nullptr) {
+    return RC::SCHEMA_TABLE_NOT_EXIST;
+  }
+
+  for (int i = 0; i < updates.attribute_num; i++) {
+    const char *attr_name = updates.attributes[i];
+    Value *value = &updates.values[i];
+
+    // update_setlect
+    if (value->type == SELECTS) {
+      Stmt *stmt = nullptr;
+      value->select->aggr_num=0;  // 临时特殊处理一下
+      RC rc = SelectStmt::create(db, *value->select, stmt);
+      if (rc != RC::SUCCESS) {
+        return rc;
+      }
+      SelectStmt *select_stmt = dynamic_cast<SelectStmt*>(stmt);
+      // FROM clause
+      const std::vector<Table *> &tables = select_stmt->tables();
+      Operator *scan_oper = try_to_create_index_scan_operator(select_stmt->filter_stmt());
+      if (nullptr == scan_oper) {
+        scan_oper = new TableScanOperator(tables.front());
+      }
+      // WHERE clause
+      PredicateOperator pred_oper(select_stmt->filter_stmt());
+      pred_oper.add_child(scan_oper);
+      // Order by clause
+      OrderByOperator order_oper(select_stmt->order_fields());
+      order_oper.add_child(&pred_oper);
+      // Aggregation clause
+      AggrOperator aggr_oper(select_stmt->aggr_fields());
+      aggr_oper.add_child(&order_oper);
+      // SELECT clause
+      ProjectOperator project_oper;
+      project_oper.add_child(&aggr_oper);
+
+      bool is_multi_mode = tables.size() >= 2;
+      for (const Field &field : select_stmt->query_fields()) {
+        project_oper.add_projection(field, is_multi_mode);
+      }
+      for (const Field &field : select_stmt->aggr_fields()) {
+        project_oper.add_projection(field, is_multi_mode);
+      }
+      rc = project_oper.open();
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("failed to open operator");
+        return rc;
+      }
+
+      while ((rc = project_oper.next()) == RC::SUCCESS) {
+        // get current record
+        // write to response
+        Tuple *tuple = project_oper.current_tuple();
+        if (nullptr == tuple) {
+          rc = RC::INTERNAL;
+          LOG_WARN("failed to get current record. rc=%s", strrc(rc));
+          break;
+        }
+        // copy tuple to value
+        // TODO : 
+      }
+
+      if (rc != RC::RECORD_EOF) {
+        LOG_WARN("something wrong while iterate operator. rc=%s", strrc(rc));
+        project_oper.close();
+      } else {
+        rc = project_oper.close();
+      }
+
+    }
+  }
+  return RC::SUCCESS;
+}
+
 RC ExecuteStage::do_update(SQLStageEvent *sql_event)
 {
   Stmt *stmt = sql_event->stmt();
@@ -675,15 +754,15 @@ RC ExecuteStage::do_update(SQLStageEvent *sql_event)
     return RC::GENERIC_ERROR;
   }
 
-  UpdateStmt *update_stmt = (UpdateStmt *)stmt;
-  Table *table = update_stmt->table();
-
-  const Updates &updates = sql_event->query()->sstr.update;
+  Updates &updates = sql_event->query()->sstr.update;
+  // for get update_select value
+  RC rc = check_updates_data(db, updates);
+  return RC::INVALID_ARGUMENT;
   // const char *table_name = updates.relation_name;
   // int updated_count = 0;
   // RC rc =
   //     table->update_record(trx, updates.attributes[0], updates.values, updates.condition_num, updates.conditions, &updated_count);
-  RC rc = db->update_table(updates.relation_name, updates.attributes, updates.values,
+  rc = db->update_table(updates.relation_name, updates.attributes, updates.values,
                           updates.attribute_num, updates.condition_num, updates.conditions);
   if (rc != RC::SUCCESS) {
     session_event->set_response("FAILURE\n");

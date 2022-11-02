@@ -439,11 +439,30 @@ update_set:
 	ID EQ value {
 		updates_append(&CONTEXT->ssql->sstr.update, $1, &CONTEXT->values[CONTEXT->value_length - 1]);
 	}
+	| ID EQ internal_select {
+  		value_init_select(&CONTEXT->values[CONTEXT->value_length],
+                    &CONTEXT->ssql->selects[CONTEXT->select_length - 1]);
+ 		updates_append(&CONTEXT->ssql->sstr.update, $1, &CONTEXT->values[CONTEXT->value_length++]);
+	}
 	;
 
 updates_sets:
 	| COMMA update_set updates_sets {
 	
+	}
+	;
+
+internal_select:
+	LBRACE SELECT select_attr FROM ID rel_list where RBRACE {
+		selects_append_relation(&CONTEXT->ssql->sstr.selection, $5);
+		// selects_reverse_relations(&CONTEXT->ssql->selects[num]);
+		selects_append_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->conditions, CONTEXT->condition_length);
+
+		//临时变量清零
+		CONTEXT->condition_length=0;
+		CONTEXT->from_length=0;
+		CONTEXT->select_length=0;
+		CONTEXT->value_length = 0;
 	}
 	;
 

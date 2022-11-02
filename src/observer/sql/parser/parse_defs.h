@@ -42,15 +42,18 @@ typedef enum {
 } CompOp;
 
 //属性值类型
-typedef enum { UNDEFINED, CHARS, INTS, DATES, TEXTS, NULLS, FLOATS } AttrType;
+typedef enum { UNDEFINED, CHARS, INTS, DATES, TEXTS, NULLS, SELECTS, FLOATS } AttrType;
 
 //聚合函数类型
 typedef enum { INVALID, MAX, MIN, SUM, AVG, COUNT } AggrType;
+
+struct _Selects;
 
 //属性值
 typedef struct _Value {
   AttrType type;  // type of value
   void *data;     // value
+  struct _Selects *select;
 } Value;
 
 // 聚合属性结构体 avg(i): {AVG, 1, null, {"t", 'i'}} count(1): {COUNT, 0, {INTS, 1}, null}
@@ -80,7 +83,7 @@ typedef struct {
 } OrderAttr;
 
 // struct of select
-typedef struct {
+typedef struct _Selects{
   size_t aggr_num;                              // Length of aggr attrs in Select clause
   AggrAttr aggr_attributes[MAX_NUM];            // Aggr attrs in Select clause
   size_t attr_num;                              // Length of attrs in Select clause
@@ -216,6 +219,8 @@ enum SqlCommandFlag {
 typedef struct Query {
   enum SqlCommandFlag flag;
   union Queries sstr;
+  Selects selects[MAX_NUM];
+  int selects_num;
 } Query;
 
 #ifdef __cplusplus
@@ -234,6 +239,7 @@ void value_init_float(Value *value, float v);
 void value_init_string(Value *value, const char *v);
 void value_init_date(Value *value, const char *v);
 void value_init_null(Value *value);
+void value_init_select(Value *value, Selects *selects);
 void value_destroy(Value *value);
 
 void condition_init(Condition *condition, CompOp comp, int left_is_attr, RelAttr *left_attr, Value *left_value,

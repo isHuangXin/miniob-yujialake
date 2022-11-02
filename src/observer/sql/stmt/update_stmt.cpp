@@ -47,6 +47,7 @@ RC UpdateStmt::create(Db *db, const Updates &update, Stmt *&stmt)
   int value_amount = update.attribute_num;
 
   // create filter statement in `where` statement
+  // 对where后面的语句判断是否合法
   FilterStmt *filter_stmt = nullptr;
   RC rc = FilterStmt::create(db, table, &table_map,
            update.conditions, update.condition_num, filter_stmt);
