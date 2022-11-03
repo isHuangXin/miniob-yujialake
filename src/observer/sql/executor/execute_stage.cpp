@@ -665,9 +665,8 @@ RC ExecuteStage::do_update(SQLStageEvent *sql_event)
   SessionEvent *session_event = sql_event->session_event();
   Session *session = session_event->session();
   Db *db = session->get_current_db();
-  Trx *trx = nullptr;
-  // Trx *trx = session->current_trx();
-  // Trx *trx = new Trx();
+  // Trx *trx = nullptr;
+  Trx *trx = session->current_trx();
   CLogManager *clog_manager = db->get_clog_manager();
 
   if (stmt == nullptr) {
