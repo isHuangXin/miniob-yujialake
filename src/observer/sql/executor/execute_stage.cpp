@@ -675,10 +675,10 @@ RC ExecuteStage::check_updates_data(Db *db, Updates &updates)
     // update_setlect
     if (value->type == SELECTS) {
       Stmt *stmt = nullptr;
-      value->select->aggr_num=0;  // 临时特殊处理一下
+      // value->select->aggr_num=0;  // 临时特殊处理一下
       RC rc = SelectStmt::create(db, *value->select, stmt);
-      updates.relation_name = new char[sizeof(table_name)];
-      memcpy(updates.relation_name, table_name, sizeof(table_name));
+      // updates.relation_name = new char[sizeof(table_name)];
+      // memcpy(updates.relation_name, table_name, sizeof(table_name));
       if (rc != RC::SUCCESS) {
         return rc;
       }

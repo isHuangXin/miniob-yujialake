@@ -12,6 +12,7 @@
 
 typedef struct ParserContext {
   Query * ssql;
+  size_t selects_num;
   size_t select_length;
   size_t condition_length;
   size_t from_length;
@@ -441,7 +442,7 @@ update_set:
 	}
 	| ID EQ internal_select {
   		value_init_select(&CONTEXT->values[CONTEXT->value_length],
-                    &CONTEXT->ssql->selects[CONTEXT->select_length - 1]);
+                    &CONTEXT->ssql->selects[CONTEXT->selects_num - 1]);
  		updates_append(&CONTEXT->ssql->sstr.update, $1, &CONTEXT->values[CONTEXT->value_length++]);
 	}
 	;
@@ -453,16 +454,19 @@ updates_sets:
 	;
 
 internal_select:
-	LBRACE SELECT select_attr FROM ID rel_list where RBRACE {
-		selects_append_relation(&CONTEXT->ssql->sstr.selection, $5);
+	LBRACE SELECT internal_select_attr FROM ID rel_list where RBRACE {
+		int num = CONTEXT->selects_num;
+		selects_append_relation(&CONTEXT->ssql->selects[num], $5);
 		// selects_reverse_relations(&CONTEXT->ssql->selects[num]);
-		selects_append_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->conditions, CONTEXT->condition_length);
+		selects_append_conditions(&CONTEXT->ssql->selects[num], CONTEXT->conditions, CONTEXT->condition_length);
 
 		//临时变量清零
 		CONTEXT->condition_length=0;
 		CONTEXT->from_length=0;
 		CONTEXT->select_length=0;
 		CONTEXT->value_length = 0;
+		CONTEXT->selects_num++;
+  		CONTEXT->ssql->selects_num = CONTEXT->selects_num;
 	}
 	;
 
@@ -487,6 +491,83 @@ select:				/*  select 语句的语法解析树*/
 			CONTEXT->join_length = 0;
 	}
 	;
+
+internal_select_attr:
+    STAR attr_list {  
+			RelAttr attr;
+			relation_attr_init(&attr, NULL, "*");
+			selects_append_attribute(&CONTEXT->ssql->selects[CONTEXT->selects_num], &attr);
+		}
+    | ID attr_list {
+			RelAttr attr;
+			relation_attr_init(&attr, NULL, $1);
+			selects_append_attribute(&CONTEXT->ssql->selects[CONTEXT->selects_num], &attr);
+		}
+  	| ID DOT ID attr_list {
+			RelAttr attr;
+			relation_attr_init(&attr, $1, $3);
+			selects_append_attribute(&CONTEXT->ssql->selects[CONTEXT->selects_num], &attr);
+		}
+	| internal_aggr_attr internal_attr_list {
+
+	}
+    ;
+
+internal_attr_list:
+    /* empty */
+    | COMMA ID attr_list {
+			RelAttr attr;
+			relation_attr_init(&attr, NULL, $2);
+			selects_append_attribute(&CONTEXT->ssql->selects[CONTEXT->selects_num], &attr);
+     	  // CONTEXT->ssql->sstr.selection.attributes[CONTEXT->select_length].relation_name = NULL;
+        // CONTEXT->ssql->sstr.selection.attributes[CONTEXT->select_length++].attribute_name=$2;
+      }
+    | COMMA ID DOT ID attr_list {
+			RelAttr attr;
+			relation_attr_init(&attr, $2, $4);
+			selects_append_attribute(&CONTEXT->ssql->selects[CONTEXT->selects_num], &attr);
+        // CONTEXT->ssql->sstr.selection.attributes[CONTEXT->select_length].attribute_name=$4;
+        // CONTEXT->ssql->sstr.selection.attributes[CONTEXT->select_length++].relation_name=$2;
+  	  }
+	| COMMA STAR attr_list {
+			RelAttr attr;
+			relation_attr_init(&attr, NULL, "*");
+			selects_append_attribute(&CONTEXT->ssql->selects[CONTEXT->selects_num], &attr);
+    }
+	| COMMA aggr_attr attr_list{
+
+	}
+  	;
+
+internal_aggr_attr:
+	 aggr_type LBRACE ID extra_attr RBRACE {
+		AggrAttr attr;
+		relation_aggr_init(&attr, CONTEXT->aggr_t, 1, NULL, $3, NULL);
+		selects_append_aggr(&CONTEXT->ssql->selects[CONTEXT->selects_num], &attr);
+	  }
+	| aggr_type LBRACE ID DOT ID extra_attr RBRACE {
+		AggrAttr attr;
+		relation_aggr_init(&attr, CONTEXT->aggr_t, 1, $3, $5, NULL);
+		selects_append_aggr(&CONTEXT->ssql->selects[CONTEXT->selects_num], &attr);
+	  }
+	| aggr_type LBRACE RBRACE {
+		AggrAttr attr;
+		relation_aggr_init(&attr, INVALID, 0, NULL, NULL, NULL);
+		selects_append_aggr(&CONTEXT->ssql->selects[CONTEXT->selects_num], &attr);
+	  }
+	| aggr_type LBRACE STAR extra_attr RBRACE {
+		AggrAttr attr;
+		relation_aggr_init(&attr, CONTEXT->aggr_t == COUNT ? COUNT : INVALID, 1, NULL, "*", NULL);
+		selects_append_aggr(&CONTEXT->ssql->selects[CONTEXT->selects_num], &attr);
+	  } 
+	| aggr_type LBRACE value extra_attr RBRACE {
+		AggrAttr attr;
+		Value *value = &CONTEXT->values[CONTEXT->value_length - 1];
+		relation_aggr_init(&attr, CONTEXT->aggr_t, 0, NULL, NULL, value);
+		selects_append_aggr(&CONTEXT->ssql->selects[CONTEXT->selects_num], &attr);
+	}
+	;
+
 
 select_attr:
     STAR attr_list {  
