@@ -68,8 +68,8 @@ RC InsertStmt::create(Db *db, const Inserts &inserts, Stmt *&stmt)
         return RC::SCHEMA_FIELD_TYPE_MISMATCH;
       }
 
-      assert((value_type != NULLS && ((char *)value.data)[field_meta->len() - 1] != 1) ||
-             (value_type == NULLS && ((char *)value.data)[field_meta->len() - 1] == 1));
+      // assert((value_type != NULLS && ((char *)value.data)[field_meta->len() - 1] != 1) ||
+      //        (value_type == NULLS && ((char *)value.data)[field_meta->len() - 1] == 1));
 
       // DATE 类型的日期不符合要求
       if (value.type == DATES && *(int *)value.data == -1) {
