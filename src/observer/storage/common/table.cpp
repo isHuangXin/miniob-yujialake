@@ -794,15 +794,43 @@ RC Table::update_record(Trx *trx, Record *record)
     trx->init_trx_info(this, *record);
   }
 
-
-
-
+  // 插入数据，对recored进行更新
   rc = record_handler_->update_record(record);
   if (rc != RC::SUCCESS) {
     LOG_ERROR("Update record failed. table name=%s, rc=%d:%s", table_meta_.name(), rc, strrc(rc));
     return rc;
   }
 
+  // 插入trx，对日志进行更新
+    if (trx != nullptr) {
+    rc = trx->update_record(this, record);
+    if (rc != RC::SUCCESS) {
+      LOG_ERROR("Failed to log operation(insertion) to trx");
+      RC rc2 = trx->delete_record(this, record);
+      if (rc2 != RC::SUCCESS) {
+        LOG_ERROR("Failed to rollback record data when update index entries failed. table name=%s, rc=%d:%s",
+            name(),
+            rc2,
+            strrc(rc2));
+      }
+      return rc;
+    }
+  }
+
+  if (trx != nullptr) {
+    // append clog record
+    CLogRecord *clog_record = nullptr;
+    rc = clog_manager_->clog_gen_record(
+        CLogType::REDO_UPDATE, trx->get_current_id(), clog_record, name(), table_meta_.record_size(), record);
+    if (rc != RC::SUCCESS) {
+      LOG_ERROR("Failed to create a clog record. rc=%d:%s", rc, strrc(rc));
+      return rc;
+    }
+    rc = clog_manager_->clog_append_record(clog_record);
+    if (rc != RC::SUCCESS) {
+      return rc;
+    }
+  }
   return rc;
 }
 
@@ -814,7 +842,6 @@ RC Table::update_multi_record(Trx *trx, char * const *attributes, const Value *v
   if (rc != RC::SUCCESS) {
     return rc;
   }
-  ConditionFilter *filter = &condition_filter;
 
   RecordFileScanner scanner;
   rc = scanner.open_scan(*data_buffer_pool_, &condition_filter);
@@ -844,7 +871,6 @@ RC Table::update_multi_record(Trx *trx, char * const *attributes, const Value *v
   // std::vector<Record> records_updated;  //保存已经完成更新的records
   // 1. 如果update的行超过1行且是关于唯一索引的操作，则不允许
   // 2. 如果删除索引之后再进行添加失败，则将刚刚的删除复原，所以得保留原来的数据。
-
 
   while (scanner.has_next()) {
     rc = scanner.next(record);
