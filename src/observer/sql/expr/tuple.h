@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
+#include <bitset>
 #include <memory>
 #include <vector>
 
@@ -119,8 +120,10 @@ public:
     const FieldMeta *field_meta = field_expr->field().meta();
     cell.set_type(field_meta->type());
     cell.set_data(this->record_->data() + field_meta->offset());
+    std::bitset<32> null_map(*(int *)this->record_->data());
     // 检查标志位
-    if (this->record_->data()[field_meta->offset() + field_meta->len() - 1] == 1) {
+    const int sys_field_num = table_->table_meta().sys_field_num();
+    if (index >= sys_field_num && null_map.test(index - sys_field_num)) {
       cell.set_type(NULLS);
     }
     cell.set_length(field_meta->len());
@@ -259,6 +262,7 @@ public:
     if (idx == -1) {
       return RC::NOTFOUND;
     }
+
     return cell_at(idx, cell);
   }
 

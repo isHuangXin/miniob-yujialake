@@ -40,9 +40,16 @@ void TableMeta::swap(TableMeta &other) noexcept
 
 RC TableMeta::init_sys_fields()
 {
-  sys_fields_.reserve(1);
+  RC rc = RC::SUCCESS;
+  sys_fields_.reserve(2);
   FieldMeta field_meta;
-  RC rc = field_meta.init(Trx::trx_field_name(), Trx::trx_field_type(), 0, Trx::trx_field_len(), false, false);
+  rc = field_meta.init("null_map", INTS, 0, 4, false, false);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to init null map field. rc = %d:%s", rc, strrc(rc));
+    return rc;
+  }
+  sys_fields_.push_back(field_meta);
+  rc = field_meta.init(Trx::trx_field_name(), Trx::trx_field_type(), 4, Trx::trx_field_len(), false, false);
   if (rc != RC::SUCCESS) {
     LOG_ERROR("Failed to init trx field. rc = %d:%s", rc, strrc(rc));
     return rc;
@@ -112,7 +119,7 @@ const char *TableMeta::name() const
 
 const FieldMeta *TableMeta::trx_field() const
 {
-  return &fields_[0];
+  return &fields_[1];
 }
 
 const FieldMeta *TableMeta::field(int index) const

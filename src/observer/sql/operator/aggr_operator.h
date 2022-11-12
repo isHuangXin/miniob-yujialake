@@ -24,13 +24,12 @@ See the Mulan PSL v2 for more details. */
 
 class AggrOperator : public Operator {
 public:
-  AggrOperator(const std::vector<Field> &aggr_fields)
-      : aggr_fields_(aggr_fields), aggr_tuple(new AggrTuple), is_aggr(false)
+  AggrOperator(const std::vector<Field> &aggr_fields) : aggr_fields_(aggr_fields), is_aggr(false)
   {
     for (auto i = 0; i < aggr_fields.size(); i++) {
       TupleCell cell;
-      aggr_tuple->add_cell(cell);
-      aggr_tuple->add_cell_spec(new TupleCellSpec(new FieldExpr(aggr_fields[i].table(), aggr_fields[i].meta())));
+      aggr_tuple_.add_cell(cell);
+      aggr_tuple_.add_cell_spec(new TupleCellSpec(new FieldExpr(aggr_fields[i].table(), aggr_fields[i].meta())));
     }
   }
 
@@ -50,6 +49,6 @@ private:
   AttrType get_return_type(const Field &aggr_field) const;
   const std::vector<Field> &aggr_fields_;
   std::vector<std::vector<TupleCell>> tuples_;
-  AggrTuple *aggr_tuple;
+  AggrTuple aggr_tuple_;
   bool is_aggr;
 };

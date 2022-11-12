@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
+#include <memory>
 #include <vector>
 
 #include "rc.h"
@@ -63,8 +64,8 @@ public:
   {
     return filter_stmt_;
   }
-  
-  const std::vector<FilterStmt *> &join_filters() const
+
+  const std::vector<std::unique_ptr<FilterStmt>> &join_filters() const
   {
     return join_filters_;
   }
@@ -74,6 +75,6 @@ private:
   std::vector<Field> aggr_fields_;
   std::vector<Field> order_fields_;
   std::vector<Table *> tables_;
-  std::vector<FilterStmt *> join_filters_;
+  std::vector<std::unique_ptr<FilterStmt>> join_filters_;
   FilterStmt *filter_stmt_ = nullptr;
 };

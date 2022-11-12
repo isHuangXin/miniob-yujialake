@@ -14,19 +14,8 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/operator/aggr_operator.h"
 #include "common/lang/string.h"
-#include "sql/expr/tuple.h"
-#include "sql/expr/tuple_cell.h"
 #include "sql/parser/parse_defs.h"
-#include "storage/common/field_meta.h"
-#include "storage/common/table.h"
 #include "util/typecast.h"
-#include "rc.h"
-#include <cstddef>
-#include <cstdint>
-#include <cstdlib>
-#include <cstring>
-#include <string>
-#include <vector>
 
 RC AggrOperator::open()
 {
@@ -42,7 +31,7 @@ RC AggrOperator::next()
   while (RC::SUCCESS == children_[0]->next()) {
     std::vector<TupleCell> cells;
     Tuple *tuple = children_[0]->current_tuple();
-    aggr_tuple->set_tuple(tuple);
+    aggr_tuple_.set_tuple(tuple);
     for (const auto &field : aggr_fields_) {
       TupleCell cell;
       if (field.aggr_param().empty()) {
@@ -56,13 +45,24 @@ RC AggrOperator::next()
   // 每一列分别做聚合
   for (int i = 0; i < aggr_fields_.size(); i++) {
     const auto &field = aggr_fields_[i];
-    TupleCell &res_cell = aggr_tuple->cell_at(i);
+    TupleCell &res_cell = aggr_tuple_.cell_at(i);
     // 参数为常数
     if (field.aggr_type() != COUNT && !field.aggr_param().empty()) {
       const char *data = field.aggr_param().data();
       res_cell.set_type(CHARS);
       res_cell.set_length(field.aggr_param().size());
       res_cell.set_data(strdup(data));
+      break;
+      // COUNT(1) or COUNT(*)
+    } else if (field.aggr_type() == COUNT && !field.aggr_param().empty()) {
+      res_cell.set_type(INTS);
+      size_t length = sizeof(int) + 1;
+      char *data = new char[length];
+      memset(data, 0, length);
+      res_cell.set_length(length);
+      int cnt = tuples_.size();
+      memcpy(data, &cnt, length - 1);
+      res_cell.set_data(data);
       break;
     }
     switch (field.aggr_type()) {
@@ -101,7 +101,7 @@ Tuple *AggrOperator::current_tuple()
   }
 
   is_aggr = true;
-  return aggr_tuple;
+  return &aggr_tuple_;
 }
 
 AttrType AggrOperator::get_return_type(const Field &aggr_field) const
@@ -251,7 +251,9 @@ RC AggrOperator::do_aggr_count(const int index, TupleCell &res_cell)
   RC rc = RC::SUCCESS;
   int cnt = 0;
   for (size_t i = 0; i < tuples_.size(); i++) {
-    cnt++;
+    if (tuples_[i][index].attr_type() != NULLS) {
+      cnt++;
+    }
   }
   res_cell.set_type(INTS);
   size_t length = sizeof(int) + 1;

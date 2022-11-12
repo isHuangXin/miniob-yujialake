@@ -71,27 +71,19 @@ void relation_aggr_destroy(AggrAttr *aggr_attr)
 void value_init_integer(Value *value, int v)
 {
   value->type = INTS;
-  value->data = malloc(sizeof(v) + 1);
-  memset(value->data, 0, sizeof(v) + 1);
+  value->data = malloc(sizeof(v));
   memcpy(value->data, &v, sizeof(v));
 }
 void value_init_float(Value *value, float v)
 {
   value->type = FLOATS;
-  value->data = malloc(sizeof(v) + 1);
-  memset(value->data, 0, sizeof(v) + 1);
+  value->data = malloc(sizeof(v));
   memcpy(value->data, &v, sizeof(v));
 }
 void value_init_string(Value *value, const char *v)
 {
   value->type = CHARS;
-  int length = strlen(v);
-  if (length >= 4096) {
-    length = 4096;
-  }
-  value->data = malloc(length + 2);
-  memset(value->data, 0, length + 2);
-  memcpy(value->data, v, length);
+  value->data = strdup(v);
 }
 
 bool is_leap(int y)
@@ -140,15 +132,16 @@ void value_init_date(Value *value, const char *v)
 void value_init_null(Value *value)
 {
   value->type = NULLS;
-  value->data = malloc(sizeof(int) + 1);
-  ((char *)value->data)[4] = 1;
+  value->data = nullptr;
 }
 
 void value_destroy(Value *value)
 {
   value->type = UNDEFINED;
-  free(value->data);
-  value->data = nullptr;
+  if (value->data != nullptr) {
+    free(value->data);
+    value->data = nullptr;
+  }
 }
 
 void condition_init(Condition *condition, CompOp comp, int left_is_attr, RelAttr *left_attr, Value *left_value,
@@ -188,9 +181,10 @@ void attr_info_init(AttrInfo *attr_info, const char *name, AttrType type, size_t
 {
   attr_info->name = strdup(name);
   attr_info->type = type;
-  attr_info->length = length + 1;
+  attr_info->length = length;
   attr_info->nullable = nullable;
 }
+
 void attr_info_destroy(AttrInfo *attr_info)
 {
   free(attr_info->name);
@@ -425,8 +419,7 @@ void drop_table_destroy(DropTable *drop_table)
   drop_table->relation_name = nullptr;
 }
 
-void create_index_init(
-    CreateIndex *create_index, const char *index_name, const char *relation_name, int is_unique)
+void create_index_init(CreateIndex *create_index, const char *index_name, const char *relation_name, int is_unique)
 {
   create_index->index_name = strdup(index_name);
   create_index->relation_name = strdup(relation_name);

@@ -420,17 +420,20 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 
   // FROM clause
   const std::vector<Table *> &tables = select_stmt->tables();
-  Operator *scan_oper = try_to_create_index_scan_operator(select_stmt->filter_stmt());
-  if (nullptr == scan_oper) {
-    scan_oper = new TableScanOperator(tables.front());
+  Operator *first_oper = try_to_create_index_scan_operator(select_stmt->filter_stmt());
+  if (nullptr == first_oper) {
+    first_oper = new TableScanOperator(tables.front());
   }
 
-  const std::vector<FilterStmt *> join_filters = select_stmt->join_filters();
+  Operator *scan_oper = first_oper;
+  const auto &join_filters = select_stmt->join_filters();
   for (int i = 1; i < tables.size(); i++) {
     // ON clause
-    FilterStmt *join_filter = i - 1 < join_filters.size() ? join_filters[i - 1] : nullptr;
+    FilterStmt *join_filter = i - 1 < join_filters.size() ? join_filters[i - 1].get() : nullptr;
     scan_oper = new JoinOperator(scan_oper, new TableScanOperator(tables[i]), join_filter);
   }
+
+  DEFER([&] { delete scan_oper; });
 
   // WHERE clause
   PredicateOperator pred_oper(select_stmt->filter_stmt());
@@ -524,7 +527,11 @@ RC ExecuteStage::do_create_index(SQLStageEvent *sql_event)
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
-  RC rc = table->create_index(nullptr, create_index.index_name, create_index.attribute_name, create_index.attribute_num, create_index.is_unique);
+  RC rc = table->create_index(nullptr,
+      create_index.index_name,
+      create_index.attribute_name,
+      create_index.attribute_num,
+      create_index.is_unique);
   sql_event->session_event()->set_response(rc == RC::SUCCESS ? "SUCCESS\n" : "FAILURE\n");
   return rc;
 }
@@ -564,8 +571,8 @@ RC ExecuteStage::do_show_index(SQLStageEvent *sql_event)
   for (int i = 0; i < index_num; i++) {
     // TODO:implement multi-index and unique index
     int field_num = table_meta.index(i)->fields_num();
-    for (int j = field_num-1; j >= 0; j--) {
-      ss << table_meta.name() << " | " << 1-(table_meta.index(i)->is_unique()) << " | ";
+    for (int j = field_num - 1; j >= 0; j--) {
+      ss << table_meta.name() << " | " << 1 - (table_meta.index(i)->is_unique()) << " | ";
       ss << table_meta.index(i)->name() << " | ";
       ss << field_num - j << " | " << table_meta.index(i)->field(j) << std::endl;
     }
@@ -682,9 +689,14 @@ RC ExecuteStage::do_update(SQLStageEvent *sql_event)
   // const char *table_name = updates.relation_name;
   // int updated_count = 0;
   // RC rc =
-  //     table->update_record(trx, updates.attributes[0], updates.values, updates.condition_num, updates.conditions, &updated_count);
-  RC rc = db->update_table(updates.relation_name, updates.attributes, updates.values,
-                          updates.attribute_num, updates.condition_num, updates.conditions);
+  //     table->update_record(trx, updates.attributes[0], updates.values, updates.condition_num, updates.conditions,
+  //     &updated_count);
+  RC rc = db->update_table(updates.relation_name,
+      updates.attributes,
+      updates.values,
+      updates.attribute_num,
+      updates.condition_num,
+      updates.conditions);
   if (rc != RC::SUCCESS) {
     session_event->set_response("FAILURE\n");
   } else {

@@ -13,6 +13,7 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include <limits.h>
+#include <bitset>
 #include <string.h>
 #include <algorithm>
 
@@ -419,12 +420,17 @@ RC Table::make_record(int value_num, const Value *values, char *&record_out)
   // 复制所有字段的值
   int record_size = table_meta_.record_size();
   char *record = new char[record_size];
+  std::bitset<32> null_map;
 
   for (int i = 0; i < value_num; i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
     const Value &value = values[i];
+    if (value.type == NULLS) {
+      null_map.set(i);
+      continue;
+    }
     size_t copy_len = field->len();
-    if (value.type != NULLS && field->type() == CHARS) {
+    if (field->type() == CHARS) {
       const size_t data_len = strlen((const char *)value.data);
       if (copy_len > data_len) {
         copy_len = data_len + 1;
@@ -432,6 +438,10 @@ RC Table::make_record(int value_num, const Value *values, char *&record_out)
     }
     memcpy(record + field->offset(), value.data, copy_len);
   }
+
+  // 将bitmap的值复制到null_map字段
+  int map_value = static_cast<int>(null_map.to_ulong());
+  memcpy(record, &map_value, sizeof(map_value));
 
   record_out = record;
   return RC::SUCCESS;
@@ -611,7 +621,7 @@ static RC insert_index_record_reader_adapter(Record *record, void *context)
   return inserter.insert_index(record);
 }
 
-RC Table::create_index(Trx *trx, const char *index_name, char* const* attribute_name, int attribute_num, int is_unique)
+RC Table::create_index(Trx *trx, const char *index_name, char *const *attribute_name, int attribute_num, int is_unique)
 {
   // TODO:multi-index
   if (common::is_blank(index_name)) {
@@ -794,9 +804,6 @@ RC Table::update_record(Trx *trx, Record *record)
     trx->init_trx_info(this, *record);
   }
 
-
-
-
   rc = record_handler_->update_record(record);
   if (rc != RC::SUCCESS) {
     LOG_ERROR("Update record failed. table name=%s, rc=%d:%s", table_meta_.name(), rc, strrc(rc));
@@ -806,7 +813,7 @@ RC Table::update_record(Trx *trx, Record *record)
   return rc;
 }
 
-RC Table::update_multi_record(Trx *trx, char * const *attributes, const Value *values, int attribute_num, 
+RC Table::update_multi_record(Trx *trx, char *const *attributes, const Value *values, int attribute_num,
     int condition_num, const Condition conditions[], int *updated_count)
 {
   CompositeConditionFilter condition_filter;
@@ -823,28 +830,26 @@ RC Table::update_multi_record(Trx *trx, char * const *attributes, const Value *v
   }
 
   // check attrs name & types
-  std::vector<const FieldMeta*> fields;
+  std::vector<const FieldMeta *> fields;
   for (int i = 0; i < attribute_num; i++) {
     if (table_meta_.field(attributes[i]) == nullptr) {
       return RC::SCHEMA_FIELD_NOT_EXIST;
     }
-    
+
     if (table_meta_.field(attributes[i])->type() != values[i].type) {
       if (table_meta_.field(attributes[i])->type() == TEXTS && values[i].type == CHARS) {
-      }
-      else {
+      } else {
         return RC::SCHEMA_FIELD_NOT_EXIST;
       }
     }
     fields.push_back(table_meta_.field(attributes[i]));
   }
-  
+
   *updated_count = 0;
   Record record;
   // std::vector<Record> records_updated;  //保存已经完成更新的records
   // 1. 如果update的行超过1行且是关于唯一索引的操作，则不允许
   // 2. 如果删除索引之后再进行添加失败，则将刚刚的删除复原，所以得保留原来的数据。
-
 
   while (scanner.has_next()) {
     rc = scanner.next(record);
@@ -852,24 +857,24 @@ RC Table::update_multi_record(Trx *trx, char * const *attributes, const Value *v
       LOG_WARN("failed to fetch next record. rc=%d:%s", rc, strrc(rc));
       return rc;
     }
-    
+
     if (trx == nullptr || trx->is_visible(this, &record)) {
       Record temp_record = record;
-      temp_record.set_data((char*)malloc(table_meta_.record_size()));
+      temp_record.set_data((char *)malloc(table_meta_.record_size()));
       memcpy(temp_record.data(), record.data(), table_meta_.record_size());
       /*判断是否可以更新*/
       rc = delete_entry_of_indexes(record.data(), record.rid(), false);
       if (rc != RC::SUCCESS) {
         // LOG_ERROR("Failed to update phase 1 indexes of record (rid=%d.%d). rc=%d:%s",
-                  // record->rid().page_num, record->rid().slot_num, rc, strrc(rc));
+        // record->rid().page_num, record->rid().slot_num, rc, strrc(rc));
         return rc;
       }
       for (int i = 0; i < attribute_num; i++) {
-         // modify temp data
-         size_t copy_len = fields[i]->len();
-         memcpy(temp_record.data() + fields[i]->offset(), values[i].data, copy_len);
-         // prepare data
-         // size_t copy_len = fields[i]->len();
+        // modify temp data
+        size_t copy_len = fields[i]->len();
+        memcpy(temp_record.data() + fields[i]->offset(), values[i].data, copy_len);
+        // prepare data
+        // size_t copy_len = fields[i]->len();
         //  memcpy(record.data() + fields[i]->offset(), values[i].data, copy_len);
       }
       // return RC::RECORD_DUPLICATE_KEY;
@@ -903,7 +908,8 @@ RC Table::update_multi_record(Trx *trx, char * const *attributes, const Value *v
   return rc;
 }
 
-RC Table::update_record_one_attr(Trx *trx, Record *record, const FieldMeta *fieldMeta, const Value *value) {
+RC Table::update_record_one_attr(Trx *trx, Record *record, const FieldMeta *fieldMeta, const Value *value)
+{
   RC rc = RC::SUCCESS;
   // 这里不考虑事务，直接原地修改
   // index应该是多余的，先保留

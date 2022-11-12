@@ -19,6 +19,7 @@ See the Mulan PSL v2 for more details. */
 #include "storage/common/db.h"
 #include "storage/common/table.h"
 #include <algorithm>
+#include <memory>
 
 SelectStmt::~SelectStmt()
 {
@@ -199,7 +200,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
   }
 
   // 为每个inner join建立一个filter statement
-  std::vector<FilterStmt *> join_filters;
+  std::vector<std::unique_ptr<FilterStmt>> join_filters;
   for (size_t i = 0; i < select_sql.join_num; i++) {
     FilterStmt *stmt = nullptr;
     RC rc = FilterStmt::create(
@@ -208,7 +209,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
       LOG_WARN("cannot construct filter stmt");
       return rc;
     }
-    join_filters.push_back(stmt);
+    join_filters.push_back(std::unique_ptr<FilterStmt>{stmt});
   }
 
   // create filter statement in `where` statement
