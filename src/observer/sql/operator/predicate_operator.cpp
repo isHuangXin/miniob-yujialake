@@ -74,6 +74,13 @@ bool PredicateOperator::do_predicate(RowTuple &tuple)
     left_expr->get_value(tuple, left_cell);
     right_expr->get_value(tuple, right_cell);
 
+    // IS NULL or IS NOT NULL
+    if (comp == IS_OP && right_cell.attr_type() == NULLS) {
+      return left_cell.attr_type() == NULLS;
+    } else if (comp == IS_NOT_OP && right_cell.attr_type() == NULLS) {
+      return left_cell.attr_type() != NULLS;
+    }
+
     if (left_cell.attr_type() == NULLS || right_cell.attr_type() == NULLS) {
       return false;
     }

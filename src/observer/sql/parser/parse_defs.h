@@ -30,14 +30,16 @@ typedef struct {
 } RelAttr;
 
 typedef enum {
-  EQUAL_TO,     //"="         0
-  LESS_EQUAL,   //"<="        1
-  NOT_EQUAL,    //"<>"        2
-  LESS_THAN,    //"<"         3
-  GREAT_EQUAL,  //">="        4
-  GREAT_THAN,   //">"         5
-  LIKE,         //"like"      6
-  NOT_LIKE,     //"not like"  7
+  EQUAL_TO,     //"="          0
+  LESS_EQUAL,   //"<="         1
+  NOT_EQUAL,    //"<>"         2
+  LESS_THAN,    //"<"          3
+  GREAT_EQUAL,  //">="         4
+  GREAT_THAN,   //">"          5
+  LIKE,         //"like"       6
+  NOT_LIKE,     //"not like"   7
+  IS_OP,        //"is"         8
+  IS_NOT_OP,    //"is not"     9
   NO_OP
 } CompOp;
 
@@ -151,7 +153,7 @@ typedef struct {
   char *index_name;               // Index name
   char *relation_name;            // Relation name
   char *attribute_name[MAX_NUM];  // Attributes name
-  int attribute_num;  // Attribute num
+  int attribute_num;              // Attribute num
   int is_unique;
 } CreateIndex;
 
@@ -263,7 +265,7 @@ void deletes_set_conditions(Deletes *deletes, Condition conditions[], size_t con
 void deletes_destroy(Deletes *deletes);
 
 // void updates_init(Updates *updates, const char *relation_name, const char *attribute_name, Value *value,
-    // Condition conditions[], size_t condition_num);
+// Condition conditions[], size_t condition_num);
 void updates_init(Updates *updates, const char *relation_name, Condition conditions[], size_t condition_num);
 void updates_destroy(Updates *updates);
 void updates_append(Updates *updates, const char *attribute_name, Value *value);
@@ -275,9 +277,8 @@ void create_table_destroy(CreateTable *create_table);
 void drop_table_init(DropTable *drop_table, const char *relation_name);
 void drop_table_destroy(DropTable *drop_table);
 
-void create_index_init(
-    CreateIndex *create_index, const char *index_name, const char *relation_name, int is_unique);
-  void create_index_add(CreateIndex *create_index, const char *attr_name);
+void create_index_init(CreateIndex *create_index, const char *index_name, const char *relation_name, int is_unique);
+void create_index_add(CreateIndex *create_index, const char *attr_name);
 void create_index_destroy(CreateIndex *create_index);
 
 void drop_index_init(DropIndex *drop_index, const char *index_name);

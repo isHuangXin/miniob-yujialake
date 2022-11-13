@@ -13,9 +13,6 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/operator/join_operator.h"
-#include "sql/expr/tuple.h"
-#include "storage/common/table.h"
-#include "rc.h"
 
 RC JoinOperator::open()
 {
@@ -51,7 +48,7 @@ RC JoinOperator::next()
   if (round_done_) {
     return RC::RECORD_EOF;
   }
-  
+
   RC rc = RC::SUCCESS;
   while (RC::SUCCESS == (rc = next_internal())) {
     Tuple *tuple = current_tuple();
@@ -106,6 +103,13 @@ bool JoinOperator::do_predicate(JoinTuple &tuple)
     TupleCell right_cell;
     left_expr->get_value(tuple, left_cell);
     right_expr->get_value(tuple, right_cell);
+
+    // IS NULL or IS NOT NULL
+    if (comp == IS_OP && right_cell.attr_type() == NULLS) {
+      return left_cell.attr_type() == NULLS;
+    } else if (comp == IS_NOT_OP && right_cell.attr_type() == NULLS) {
+      return left_cell.attr_type() != NULLS;
+    }
 
     if (left_cell.attr_type() == NULLS || right_cell.attr_type() == NULLS) {
       return false;

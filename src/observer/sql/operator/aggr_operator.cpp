@@ -191,13 +191,16 @@ RC AggrOperator::do_aggr_avg(const int index, TupleCell &res_cell)
     }
   }
 
-  res_cell.set_type(FLOATS);
   size_t length = sizeof(float) + 1;
+  res_cell.set_length(length);
   char *data = new char[length];
   memset(data, 0, length);
-  res_cell.set_length(length);
   if (cnt != 0) {
     res /= cnt;
+    res_cell.set_type(FLOATS);
+    // return null when all cell is null
+  } else {
+    res_cell.set_type(NULLS);
   }
   memcpy(data, &res, length - 1);
   res_cell.set_data(data);
@@ -255,6 +258,7 @@ RC AggrOperator::do_aggr_count(const int index, TupleCell &res_cell)
       cnt++;
     }
   }
+
   res_cell.set_type(INTS);
   size_t length = sizeof(int) + 1;
   char *data = new char[length];

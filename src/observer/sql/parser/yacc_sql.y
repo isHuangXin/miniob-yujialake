@@ -824,6 +824,8 @@ comOp:
     | NE { CONTEXT->comp = NOT_EQUAL; }
 	| LK { CONTEXT->comp = LIKE; }
 	| NOT LK { CONTEXT->comp = NOT_LIKE; }
+	| IS  { CONTEXT->comp = IS_OP; }
+	| IS NOT { CONTEXT->comp = IS_NOT_OP; }
     ;
 order_by:
 	/* empty */

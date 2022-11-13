@@ -7,4 +7,4 @@ python3 miniob_test.py \
         --use-unix-socket \
         --code-type=none \
         --target-dir=./miniob \
-        --log=stdout \
+        --log=stdout 
