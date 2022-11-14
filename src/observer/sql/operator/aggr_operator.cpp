@@ -185,6 +185,9 @@ RC AggrOperator::do_aggr_avg(const int index, TupleCell &res_cell)
         res += chars_to_floats(cell.data());
         cnt++;
       } break;
+      case DATES: {
+        cnt++;
+      } break;
       default: {
         continue;
       }

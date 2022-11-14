@@ -1,5 +1,6 @@
 python3 miniob_test.py \
         --db-base-dir=../../build/ \
+        --db-config=../../etc/observer.ini \
         --test-case-dir=./test  \
         --test-case-scores=case-scores.json \
         --test-result-dir=result \

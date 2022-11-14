@@ -420,7 +420,9 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 
   // FROM clause
   const std::vector<Table *> &tables = select_stmt->tables();
-  Operator *first_oper = try_to_create_index_scan_operator(select_stmt->filter_stmt());
+  // TODO:走索引的列查不到数据
+  // Operator *first_oper = try_to_create_index_scan_operator(select_stmt->filter_stmt());
+  Operator *first_oper = nullptr;
   if (nullptr == first_oper) {
     first_oper = new TableScanOperator(tables.front());
   }
