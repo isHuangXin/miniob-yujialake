@@ -172,7 +172,7 @@ INSERT INTO null_table3 VALUES (2, null);
 SUCCESS
 SELECT count(num) FROM null_table3;
 COUNT(NUM)
-0
+NULL
 SELECT min(num) FROM null_table3;
 MIN(NUM)
 NULL

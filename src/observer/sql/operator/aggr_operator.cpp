@@ -137,6 +137,7 @@ RC AggrOperator::do_aggr_max(const int index, TupleCell &res_cell)
 {
   RC rc = RC::SUCCESS;
   res_cell = tuples_[0][index];
+  bool null_res = true;
 
   // 获取每列对应字段的数据
   for (size_t i = 1; i < tuples_.size(); i++) {
@@ -144,6 +145,13 @@ RC AggrOperator::do_aggr_max(const int index, TupleCell &res_cell)
     if (res_cell.compare(rhs) < 0) {
       res_cell = rhs;
     }
+    if (rhs.attr_type() != NULLS) {
+      null_res = false;
+    }
+  }
+
+  if (null_res) {
+    res_cell.set_type(NULLS);
   }
   return rc;
 }
@@ -151,6 +159,7 @@ RC AggrOperator::do_aggr_min(const int index, TupleCell &res_cell)
 {
   RC rc = RC::SUCCESS;
   res_cell = tuples_[0][index];
+  bool null_res = true;
 
   // 获取每列对应字段的数据
   for (size_t i = 1; i < tuples_.size(); i++) {
@@ -158,8 +167,14 @@ RC AggrOperator::do_aggr_min(const int index, TupleCell &res_cell)
     if (res_cell.compare(rhs) > 0) {
       res_cell = rhs;
     }
+    if (rhs.attr_type() != NULLS) {
+      null_res = false;
+    }
   }
 
+  if (null_res) {
+    res_cell.set_type(NULLS);
+  }
   return rc;
 }
 RC AggrOperator::do_aggr_avg(const int index, TupleCell &res_cell)
@@ -210,11 +225,15 @@ RC AggrOperator::do_aggr_avg(const int index, TupleCell &res_cell)
 RC AggrOperator::do_aggr_sum(const int index, TupleCell &res_cell)
 {
   RC rc = RC::SUCCESS;
-
   float res = 0;
+  bool null_res = true;
+
   // 获取每列对应字段的数据
   for (size_t i = 0; i < tuples_.size(); i++) {
     TupleCell cell = tuples_[i][index];
+    if (cell.attr_type() != NULLS) {
+      null_res = false;
+    }
     switch (cell.attr_type()) {
       case INTS: {
         res += *(int *)cell.data();
@@ -225,10 +244,16 @@ RC AggrOperator::do_aggr_sum(const int index, TupleCell &res_cell)
       case CHARS: {
         res += chars_to_floats(cell.data());
       } break;
+      case DATES: {
+      }
       default: {
         continue;
       }
     }
+  }
+  if (null_res) {
+    res_cell.set_type(NULLS);
+    return rc;
   }
   res_cell.set_type(aggr_fields_[index].attr_type());
   if (aggr_fields_[index].attr_type() == CHARS) {
@@ -253,12 +278,19 @@ RC AggrOperator::do_aggr_count(const int index, TupleCell &res_cell)
 {
   RC rc = RC::SUCCESS;
   int cnt = 0;
+  bool null_res = true;
+
   for (size_t i = 0; i < tuples_.size(); i++) {
     if (tuples_[i][index].attr_type() != NULLS) {
       cnt++;
+      null_res = false;
     }
   }
-
+  
+  if (null_res) {
+    res_cell.set_type(NULLS);
+    return rc;
+  }
   res_cell.set_type(INTS);
   size_t length = sizeof(int) + 1;
   char *data = new char[length];

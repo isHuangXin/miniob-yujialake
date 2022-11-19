@@ -1,0 +1,32 @@
+-- echo 1. create table
+create table t_clog(id int, age int, name char);
+insert into t_clog values(1, 1, 'a');
+insert into t_clog values(2, 2, 'b');
+insert into t_clog values(4, 4, 'd');
+
+-- sort select * from t_clog;
+
+-- connect client1
+-- connect client2
+
+-- connection client2
+begin;
+insert into t_clog values(3,3,'c');
+update t_clog set age = 11 where id = 1;
+
+-- connection client1
+begin;
+delete from t_clog where id = 4;
+update t_clog set age = 22 where id = 2;
+
+-- connection client2
+insert into t_clog values(5, 5, 'e');
+
+-- connection client1
+commit;
+
+-- connection default
+-- sort select * from t_clog;
+
+-- restart
+-- sort select * from t_clog;
