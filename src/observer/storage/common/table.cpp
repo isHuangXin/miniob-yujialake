@@ -767,6 +767,70 @@ static RC record_reader_update_adapter(Record *record, void *context)
   return record_updater.update_record(record);
 }
 
+RC Table::update_record(
+    Trx *trx, Record *record, const std::vector<const char *> &attrs, const std::vector<Value> &values)
+{
+  RC rc = RC::SUCCESS;
+  // 保留旧数据，同时赋值新数据
+  Record old_rec;
+  int record_size = table_meta_.record_size();
+  char *data = new char[record_size];
+  memcpy(data, record->data(), record_size);
+  old_rec.set_data(data);
+  old_rec.set_rid(record->rid());
+
+  std::bitset<32> null_map(*(int *)record->data());
+  for (size_t i = 0; i < attrs.size(); i++) {
+    const FieldMeta *field_meta = table_meta_.field(attrs[i]);
+    const int field_index = table_meta_.field_index(attrs[i]);
+
+    if (field_meta == nullptr) {
+      rc = RC::SCHEMA_FIELD_MISSING;
+      LOG_ERROR("Failed to update record. rc=%d:%s", rc, strrc(rc));
+      return rc;
+    }
+
+    if (values[i].type != NULLS) {
+      memcpy(record->data() + field_meta->offset(), values[i].data, field_meta->len());
+    }
+    null_map.set(field_index - table_meta_.sys_field_num(), values[i].type == NULLS);
+  }
+
+  int null_value = static_cast<int>(null_map.to_ulong());
+  memcpy(record->data(), &null_value, sizeof(int));
+
+  rc = record_handler_->update_record(record);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR(
+        "Failed to delete record (rid=%d.%d). rc=%d:%s", record->rid().page_num, record->rid().slot_num, rc, strrc(rc));
+    return rc;
+  }
+
+  // 更新索引
+  rc = delete_entry_of_indexes(old_rec.data(), old_rec.rid(), false);
+  if (rc != RC::SUCCESS) {
+    record_handler_->update_record(&old_rec);
+    LOG_ERROR("Failed to delete indexes of record (rid=%d.%d). rc=%d:%s",
+        old_rec.rid().page_num,
+        old_rec.rid().slot_num,
+        rc,
+        strrc(rc));
+    return rc;
+  }
+
+  rc = insert_entry_of_indexes(record->data(), record->rid());
+  if (rc != RC::SUCCESS) {
+    if (rc == RC::RECORD_DUPLICATE_KEY) {
+    } else {
+      record_handler_->update_record(&old_rec);
+      insert_entry_of_indexes(old_rec.data(), old_rec.rid());
+    }
+    return rc;
+  }
+
+  return rc;
+}
+
 RC Table::update_record(Trx *trx, const char *attribute_name, const Value *value, int condition_num,
     const Condition conditions[], int *updated_count)
 {

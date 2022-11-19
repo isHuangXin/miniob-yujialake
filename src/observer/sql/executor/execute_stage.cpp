@@ -35,6 +35,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/predicate_operator.h"
 #include "sql/operator/delete_operator.h"
 #include "sql/operator/project_operator.h"
+#include "sql/operator/update_operator.h"
 #include "sql/parser/parse_defs.h"
 #include "sql/stmt/stmt.h"
 #include "sql/stmt/select_stmt.h"
@@ -420,7 +421,8 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 
   // FROM clause
   const std::vector<Table *> &tables = select_stmt->tables();
-  Operator *first_oper = try_to_create_index_scan_operator(select_stmt->filter_stmt());
+  // FIXME: 目前null field走不了索引 try_to_create_index_scan_operator(select_stmt->filter_stmt());
+  Operator *first_oper = nullptr;
   if (nullptr == first_oper) {
     first_oper = new TableScanOperator(tables.front());
   }
@@ -670,12 +672,7 @@ RC ExecuteStage::do_update(SQLStageEvent *sql_event)
 {
   Stmt *stmt = sql_event->stmt();
   SessionEvent *session_event = sql_event->session_event();
-  Session *session = session_event->session();
-  Db *db = session->get_current_db();
   Trx *trx = nullptr;
-  // Trx *trx = session->current_trx();
-  // Trx *trx = new Trx();
-  CLogManager *clog_manager = db->get_clog_manager();
 
   if (stmt == nullptr) {
     LOG_WARN("cannot find statement");
@@ -683,20 +680,13 @@ RC ExecuteStage::do_update(SQLStageEvent *sql_event)
   }
 
   UpdateStmt *update_stmt = (UpdateStmt *)stmt;
-  Table *table = update_stmt->table();
+  TableScanOperator scan_oper(update_stmt->table());
+  PredicateOperator pred_oper(update_stmt->filter_stmt());
+  pred_oper.add_child(&scan_oper);
+  UpdateOperator update_oper(update_stmt, trx);
+  update_oper.add_child(&pred_oper);
 
-  const Updates &updates = sql_event->query()->sstr.update;
-  // const char *table_name = updates.relation_name;
-  // int updated_count = 0;
-  // RC rc =
-  //     table->update_record(trx, updates.attributes[0], updates.values, updates.condition_num, updates.conditions,
-  //     &updated_count);
-  RC rc = db->update_table(updates.relation_name,
-      updates.attributes,
-      updates.values,
-      updates.attribute_num,
-      updates.condition_num,
-      updates.conditions);
+  RC rc = update_oper.open();
   if (rc != RC::SUCCESS) {
     session_event->set_response("FAILURE\n");
   } else {

@@ -62,8 +62,10 @@ public:
       const Condition conditions[], int *updated_count);
 
   RC update_record(Trx *trx, Record *record);
-  RC update_multi_record(Trx *trx, char * const *attributes, const Value *value, int attribute_num, 
-    int condition_num, const Condition conditions[], int *updated_count);
+  RC update_multi_record(Trx *trx, char *const *attributes, const Value *value, int attribute_num, int condition_num,
+      const Condition conditions[], int *updated_count);
+  RC update_record(
+      Trx *trx, Record *old_record, const std::vector<const char *> &attrs, const std::vector<Value> &values);
   RC delete_record(Trx *trx, ConditionFilter *filter, int *deleted_count);
   RC delete_record(Trx *trx, Record *record);
   RC recover_delete_record(Record *record);
@@ -71,7 +73,7 @@ public:
   RC scan_record(Trx *trx, ConditionFilter *filter, int limit, void *context,
       void (*record_reader)(const char *data, void *context));
 
-  RC create_index(Trx *trx, const char *index_name, char* const* attribute_name, int attribute_num, int is_unique);
+  RC create_index(Trx *trx, const char *index_name, char *const *attribute_name, int attribute_num, int is_unique);
 
   RC get_record_scanner(RecordFileScanner &scanner);
 

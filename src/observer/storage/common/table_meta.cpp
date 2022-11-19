@@ -126,6 +126,17 @@ const FieldMeta *TableMeta::field(int index) const
 {
   return &fields_[index];
 }
+
+const int TableMeta::field_index(const char *name) const
+{
+  for (size_t i = 0; i < fields_.size(); i++) {
+    if (0 == strcasecmp(fields_[i].name(), name)) {
+      return i;
+    }
+  }
+  return -1;
+}
+
 // 这个应该用不上了，改成多列了
 const FieldMeta *TableMeta::field(const char *name) const
 {

@@ -13,14 +13,14 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "common/log/log.h"
-#include "sql/parser/parse_defs.h"
 #include "sql/stmt/update_stmt.h"
 #include "sql/stmt/filter_stmt.h"
 #include "storage/common/db.h"
 #include "storage/common/table.h"
 
-UpdateStmt::UpdateStmt(Table *table, Value *values, int value_amount)
-    : table_(table), values_(values), value_amount_(value_amount)
+UpdateStmt::UpdateStmt(
+    Table *table, std::vector<Value> values, std::vector<const char *> attrs, FilterStmt *filter_stmt)
+    : table_(table), values_(values), attrs_(attrs), filter_stmt_(filter_stmt)
 {}
 
 RC UpdateStmt::create(Db *db, const Updates &update, Stmt *&stmt)
@@ -38,14 +38,36 @@ RC UpdateStmt::create(Db *db, const Updates &update, Stmt *&stmt)
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
-  std::unordered_map<std::string, Table *> table_map;
-  table_map.insert(std::pair<std::string, Table *>(std::string(table_name), table));
-
   // check the fields number
-  // Value *value = const_cast<Value *>(&update.value);
-  Value *values = const_cast<Value *>(update.values);
-  int value_amount = update.attribute_num;
+  std::vector<const char *> attrs;
+  std::vector<Value> values;
+  for (size_t i = 0; i < update.attribute_num; i++) {
+    const FieldMeta *field_meta = table->table_meta().field(update.attributes[i]);
+    if (nullptr == field_meta) {
+      LOG_WARN("no such field. db=%s, table_name=%s, attribute_name=%s", db->name(), table_name, update.attributes[i]);
+      return RC::SCHEMA_FIELD_NOT_EXIST;
+    }
 
+    const Value &value = update.values[i];
+
+    // 非空字段不允许为NULL、
+    if (value.type == NULLS && !field_meta->nullable()) {
+      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+    }
+
+    // 不支持隐式转换
+    if (value.type != NULLS && value.type != field_meta->type()) {
+      if (value.type == CHARS && field_meta->type() == TEXTS) {
+      } else {
+        return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+      }
+    }
+
+    values.push_back(value);
+    attrs.push_back(field_meta->name());
+  }
+
+  std::unordered_map<std::string, Table *> table_map{{table_name, table}};
   // create filter statement in `where` statement
   FilterStmt *filter_stmt = nullptr;
   RC rc = FilterStmt::create(db, table, &table_map, update.conditions, update.condition_num, filter_stmt);
@@ -54,6 +76,6 @@ RC UpdateStmt::create(Db *db, const Updates &update, Stmt *&stmt)
     return rc;
   }
 
-  stmt = new UpdateStmt(table, values, value_amount);
+  stmt = new UpdateStmt(table, values, attrs, filter_stmt);
   return rc;
 }
