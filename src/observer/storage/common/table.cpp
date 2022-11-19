@@ -799,6 +799,10 @@ RC Table::update_record(
   int null_value = static_cast<int>(null_map.to_ulong());
   memcpy(record->data(), &null_value, sizeof(int));
 
+  if (trx != nullptr) {
+    trx->init_trx_info(this, *record);
+  }
+
   rc = record_handler_->update_record(record);
   if (rc != RC::SUCCESS) {
     LOG_ERROR(
@@ -806,28 +810,80 @@ RC Table::update_record(
     return rc;
   }
 
+  if (trx != nullptr) {
+    rc = trx->update_record(this, record);
+    if (rc != RC::SUCCESS) {
+      LOG_ERROR("Failed to log operation(update) to trx");
+      RC rc2 = trx->delete_record(this, record);
+      if (rc2 != RC::SUCCESS) {
+        LOG_ERROR("Failed to rollback record data when update record failed. table name=%s, rc=%d:%s",
+            name(),
+            rc2,
+            strrc(rc2));
+      }
+      return rc;
+    }
+  }
+
   // 更新索引
   rc = delete_entry_of_indexes(old_rec.data(), old_rec.rid(), false);
   if (rc != RC::SUCCESS) {
-    record_handler_->update_record(&old_rec);
     LOG_ERROR("Failed to delete indexes of record (rid=%d.%d). rc=%d:%s",
         old_rec.rid().page_num,
         old_rec.rid().slot_num,
         rc,
         strrc(rc));
+    RC rc2 = record_handler_->update_record(&old_rec);
+    if (rc2 != RC::SUCCESS) {
+      LOG_ERROR("Failed to rollback record data when delete index entries failed. table name=%s, rc=%d:%s",
+          name(),
+          rc2,
+          strrc(rc2));
+    }
     return rc;
   }
 
   rc = insert_entry_of_indexes(record->data(), record->rid());
   if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to insert indexes of record (rid=%d.%d). rc=%d:%s",
+        old_rec.rid().page_num,
+        old_rec.rid().slot_num,
+        rc,
+        strrc(rc));
     if (rc == RC::RECORD_DUPLICATE_KEY) {
     } else {
-      record_handler_->update_record(&old_rec);
-      insert_entry_of_indexes(old_rec.data(), old_rec.rid());
+      RC rc2 = record_handler_->update_record(&old_rec);
+      if (rc2 != RC::SUCCESS) {
+        LOG_ERROR("Failed to rollback record data when insert index entries failed. table name=%s, rc=%d:%s",
+            name(),
+            rc2,
+            strrc(rc2));
+      }
+      RC rc3 = insert_entry_of_indexes(old_rec.data(), old_rec.rid());
+      if (rc3 != RC::SUCCESS) {
+        LOG_ERROR("Failed to rollback record data when insert index entries failed. table name=%s, rc=%d:%s",
+            name(),
+            rc3,
+            strrc(rc3));
+      }
     }
     return rc;
   }
 
+  if (trx != nullptr) {
+    // append clog record
+    CLogRecord *clog_record = nullptr;
+    rc = clog_manager_->clog_gen_record(
+        CLogType::REDO_UPDATE, trx->get_current_id(), clog_record, name(), table_meta_.record_size(), record);
+    if (rc != RC::SUCCESS) {
+      LOG_ERROR("Failed to create a clog record. rc=%d:%s", rc, strrc(rc));
+      return rc;
+    }
+    rc = clog_manager_->clog_append_record(clog_record);
+    if (rc != RC::SUCCESS) {
+      return rc;
+    }
+  }
   return rc;
 }
 

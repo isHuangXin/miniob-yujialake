@@ -37,6 +37,7 @@ CLogRecord::CLogRecord(CLogType flag, int32_t trx_id, const char *table_name /* 
       log_record_.mtr.hdr_.logrec_len_ = sizeof(CLogMTRRecord);
       log_record_.mtr.hdr_.lsn_ = CLogManager::get_next_lsn(log_record_.mtr.hdr_.logrec_len_);
     } break;
+    case REDO_UPDATE:
     case REDO_INSERT: {
       if (!rec || !rec->data()) {
         LOG_ERROR("Record is null");
@@ -79,6 +80,7 @@ CLogRecord::CLogRecord(char *data)
     case REDO_MTR_COMMIT: {
       log_record_.mtr.hdr_ = *hdr;
     } break;
+    case REDO_UPDATE:
     case REDO_INSERT: {
       log_record_.ins.hdr_ = *hdr;
       data += sizeof(CLogRecordHeader);
@@ -106,7 +108,7 @@ CLogRecord::CLogRecord(char *data)
 
 CLogRecord::~CLogRecord()
 {
-  if (REDO_INSERT == flag_) {
+  if (REDO_INSERT == flag_ || REDO_UPDATE == flag_) {
     delete[] log_record_.ins.data_;
   }
 }
@@ -116,7 +118,7 @@ RC CLogRecord::copy_record(void *dest, int start_off, int copy_len)
   CLogRecords *log_rec = &log_record_;
   if (start_off + copy_len > get_logrec_len()) {
     return RC::GENERIC_ERROR;
-  } else if (flag_ != REDO_INSERT) {
+  } else if (flag_ != REDO_INSERT && flag_ != REDO_UPDATE) {
     memcpy(dest, (char *)log_rec + start_off, copy_len);
   } else {
     if (start_off > CLOG_INS_REC_NODATA_SIZE) {
@@ -142,6 +144,7 @@ int CLogRecord::cmp_eq(CLogRecord *other)
       case REDO_MTR_BEGIN:
       case REDO_MTR_COMMIT:
         return log_record_.mtr == other_logrec->mtr;
+      case REDO_UPDATE:
       case REDO_INSERT:
         return log_record_.ins == other_logrec->ins;
       case REDO_DELETE:
