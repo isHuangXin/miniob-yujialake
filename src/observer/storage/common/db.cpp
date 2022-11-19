@@ -92,7 +92,7 @@ RC Db::drop_table(const char *table_name)
   // check table_name
   if (opened_tables_.count(table_name) == 0) {
     LOG_WARN("%s table not exist before.", table_name);
-    return RC::SCHEMA_TABLE_EXIST;
+    return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
   // 文件路径可以移到Table模块
@@ -100,7 +100,6 @@ RC Db::drop_table(const char *table_name)
   rc = table->drop(table_name, path_.c_str());
   if (rc != RC::SUCCESS) {
     LOG_ERROR("Failed to drop table %s.", table_name);
-    delete table;
     return rc;
   }
 

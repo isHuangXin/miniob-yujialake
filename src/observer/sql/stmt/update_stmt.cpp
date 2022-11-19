@@ -20,7 +20,7 @@ See the Mulan PSL v2 for more details. */
 #include "storage/common/table.h"
 
 UpdateStmt::UpdateStmt(Table *table, Value *values, int value_amount)
-  : table_ (table), values_(values), value_amount_(value_amount)
+    : table_(table), values_(values), value_amount_(value_amount)
 {}
 
 RC UpdateStmt::create(Db *db, const Updates &update, Stmt *&stmt)
@@ -48,8 +48,7 @@ RC UpdateStmt::create(Db *db, const Updates &update, Stmt *&stmt)
 
   // create filter statement in `where` statement
   FilterStmt *filter_stmt = nullptr;
-  RC rc = FilterStmt::create(db, table, &table_map,
-           update.conditions, update.condition_num, filter_stmt);
+  RC rc = FilterStmt::create(db, table, &table_map, update.conditions, update.condition_num, filter_stmt);
   if (rc != RC::SUCCESS) {
     LOG_WARN("cannot construct filter stmt");
     return rc;
