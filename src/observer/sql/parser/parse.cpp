@@ -135,12 +135,22 @@ void value_init_null(Value *value)
   value->data = nullptr;
 }
 
+void value_init_select(Value *value, Selects *select)
+{
+  value->type = SELECTS;
+  value->data = nullptr;
+  value->select = select;
+}
+
 void value_destroy(Value *value)
 {
   value->type = UNDEFINED;
   if (value->data != nullptr) {
     free(value->data);
     value->data = nullptr;
+  }
+  if (value->select) {
+    selects_destroy(value->select);
   }
 }
 

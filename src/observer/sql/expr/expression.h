@@ -20,24 +20,27 @@ See the Mulan PSL v2 for more details. */
 
 class Tuple;
 
-enum class ExprType {
-  NONE,
-  FIELD,
-  VALUE,
-};
+enum class ExprType { NONE, FIELD, VALUE, SUB_SELECT };
 
-class Expression
-{
-public: 
+class Expression {
+public:
   Expression() = default;
   virtual ~Expression() = default;
-  
+
   virtual RC get_value(const Tuple &tuple, TupleCell &cell) const = 0;
   virtual ExprType type() const = 0;
+  virtual bool in(const TupleCell &cell) const
+  {
+    return RC::UNIMPLENMENT;
+  }
+
+  virtual bool not_in(const TupleCell &cell) const
+  {
+    return RC::UNIMPLENMENT;
+  }
 };
 
-class FieldExpr : public Expression
-{
+class FieldExpr : public Expression {
 public:
   FieldExpr() = default;
   FieldExpr(const Table *table, const FieldMeta *field) : field_(table, field)
@@ -71,12 +74,12 @@ public:
   }
 
   RC get_value(const Tuple &tuple, TupleCell &cell) const override;
+
 private:
   Field field_;
 };
 
-class ValueExpr : public Expression
-{
+class ValueExpr : public Expression {
 public:
   ValueExpr() = default;
   ValueExpr(const Value &value) : tuple_cell_(value.type, (char *)value.data)
@@ -88,16 +91,50 @@ public:
 
   virtual ~ValueExpr() = default;
 
-  RC get_value(const Tuple &tuple, TupleCell & cell) const override;
+  RC get_value(const Tuple &tuple, TupleCell &cell) const override;
   ExprType type() const override
   {
     return ExprType::VALUE;
   }
 
-  void get_tuple_cell(TupleCell &cell) const {
+  void get_tuple_cell(TupleCell &cell) const
+  {
     cell = tuple_cell_;
   }
 
 private:
   TupleCell tuple_cell_;
+};
+
+class SelectStmt;
+class SubSelectExpr : public Expression {
+public:
+  SubSelectExpr(SelectStmt *select_stmt) : select_stmt_(select_stmt)
+  {}
+
+  ~SubSelectExpr() = default;
+
+  RC get_value(const Tuple &tuple, TupleCell &cell) const override
+  {
+    return RC::UNIMPLENMENT;
+  }
+
+  ExprType type() const override
+  {
+    return ExprType::SUB_SELECT;
+  }
+
+  void get_tuple_cell(TupleCell &cell) const
+  {}
+
+  bool in(const TupleCell &cell) const override;
+  bool not_in(const TupleCell &cell) const override;
+
+private:
+  void execute();
+
+private:
+  SelectStmt *select_stmt_ = nullptr;
+  std::vector<Tuple *> tuples_;
+  bool is_executed = false;
 };

@@ -413,6 +413,46 @@ IndexScanOperator *try_to_create_index_scan_operator(FilterStmt *filter_stmt)
   return oper;
 }
 
+Operator *ExecuteStage::create_selection_executor(const SelectStmt *select_stmt)
+{
+  // FROM clause
+  const std::vector<Table *> &tables = select_stmt->tables();
+  Operator *scan_oper = try_to_create_index_scan_operator(select_stmt->filter_stmt());
+  if (nullptr == scan_oper) {
+    scan_oper = new TableScanOperator(tables.front());
+  }
+
+  const auto &join_filters = select_stmt->join_filters();
+  for (int i = 1; i < tables.size(); i++) {
+    // ON clause
+    FilterStmt *join_filter = i - 1 < join_filters.size() ? join_filters[i - 1].get() : nullptr;
+    scan_oper = new JoinOperator(scan_oper, new TableScanOperator(tables[i]), join_filter);
+  }
+
+  // WHERE clause
+  PredicateOperator *pred_oper = new PredicateOperator(select_stmt->filter_stmt());
+  pred_oper->add_child(scan_oper);
+  // Order by clause
+  OrderByOperator *order_oper = new OrderByOperator(select_stmt->order_fields());
+  order_oper->add_child(pred_oper);
+  // Aggregation clause
+  AggrOperator *aggr_oper = new AggrOperator(select_stmt->aggr_fields());
+  aggr_oper->add_child(order_oper);
+  // SELECT clause
+  ProjectOperator *project_oper = new ProjectOperator();
+  project_oper->add_child(aggr_oper);
+
+  bool is_multi_mode = tables.size() >= 2;
+  for (const Field &field : select_stmt->query_fields()) {
+    project_oper->add_projection(field, is_multi_mode);
+  }
+  for (const Field &field : select_stmt->aggr_fields()) {
+    project_oper->add_projection(field, is_multi_mode);
+  }
+
+  return project_oper;
+}
+
 RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 {
   SelectStmt *select_stmt = (SelectStmt *)(sql_event->stmt());

@@ -16,6 +16,7 @@ See the Mulan PSL v2 for more details. */
 #define __OBSERVER_SQL_EXECUTE_STAGE_H__
 
 #include "common/seda/stage.h"
+#include "sql/operator/operator.h"
 #include "sql/parser/parse.h"
 #include "rc.h"
 
@@ -27,6 +28,9 @@ class ExecuteStage : public common::Stage {
 public:
   ~ExecuteStage();
   static Stage *make_stage(const std::string &tag);
+
+public:
+  static Operator* create_selection_executor(const SelectStmt *select_stmt);
 
 protected:
   // common function

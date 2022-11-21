@@ -40,19 +40,22 @@ typedef enum {
   NOT_LIKE,     //"not like"   7
   IS_OP,        //"is"         8
   IS_NOT_OP,    //"is not"     9
+  IN_OP,        //"in"         10
+  NOT_IN_OP,    //"not in"     11
   NO_OP
 } CompOp;
 
 //属性值类型
-typedef enum { UNDEFINED, CHARS, INTS, DATES, TEXTS, NULLS, FLOATS } AttrType;
+typedef enum { UNDEFINED, CHARS, INTS, DATES, TEXTS, NULLS, FLOATS, SELECTS } AttrType;
 
 //聚合函数类型
 typedef enum { INVALID, MAX, MIN, SUM, AVG, COUNT } AggrType;
 
 //属性值
 typedef struct _Value {
-  AttrType type;  // type of value
-  void *data;     // value
+  AttrType type;            // type of value
+  void *data;               // value
+  struct _Selects *select;  // select
 } Value;
 
 // 聚合属性结构体 avg(i): {AVG, 1, null, {"t", 'i'}} count(1): {COUNT, 0, {INTS, 1}, null}
@@ -82,7 +85,7 @@ typedef struct {
 } OrderAttr;
 
 // struct of select
-typedef struct {
+typedef struct _Selects {
   size_t aggr_num;                              // Length of aggr attrs in Select clause
   AggrAttr aggr_attributes[MAX_NUM];            // Aggr attrs in Select clause
   size_t attr_num;                              // Length of attrs in Select clause
@@ -236,6 +239,7 @@ void value_init_float(Value *value, float v);
 void value_init_string(Value *value, const char *v);
 void value_init_date(Value *value, const char *v);
 void value_init_null(Value *value);
+void value_init_select(Value *value, Selects *select);
 void value_destroy(Value *value);
 
 void condition_init(Condition *condition, CompOp comp, int left_is_attr, RelAttr *left_attr, Value *left_value,

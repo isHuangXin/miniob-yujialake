@@ -13,16 +13,17 @@
 typedef struct ParserContext {
   Query * ssql;
   size_t select_length;
-  size_t condition_length;
+  Selects selects[MAX_NUM];
+  size_t condition_length[MAX_NUM];
   size_t from_length;
   size_t value_length;
   Value values[MAX_NUM];
-  Condition conditions[MAX_NUM];
+  Condition conditions[MAX_NUM][MAX_NUM];
   size_t join_length;
   size_t curr_join_length;
   Condition join_conditions[MAX_NUM][MAX_NUM];
   size_t join_conditions_length[MAX_NUM];
-  CompOp comp;
+  CompOp comp[MAX_NUM];
   int is_desc;
   AggrType aggr_t;
   char id[MAX_NUM];
@@ -46,14 +47,14 @@ void yyerror(yyscan_t scanner, const char *str)
   ParserContext *context = (ParserContext *)(yyget_extra(scanner));
   query_reset(context->ssql);
   context->ssql->flag = SCF_ERROR;
-  context->condition_length = 0;
+  context->condition_length[0] = 0;
   context->from_length = 0;
   context->select_length = 0;
   context->value_length = 0;
   context->join_length = 0;
   context->row_num = 0;
   context->ssql->sstr.insertion.value_num = 0;
-  printf("parse sql failed. error=%s", str);
+  printf("parse sql failed. error=%s\n", str);
 }
 
 ParserContext *get_context(yyscan_t scanner)
@@ -129,6 +130,7 @@ ParserContext *get_context(yyscan_t scanner)
 		ORDER
 		BY
 		ASC
+		IN
 
 %union {
   struct _Attr *attr;
@@ -402,36 +404,44 @@ value:
     } 
 	| NULL_T {
 		value_init_null(&CONTEXT->values[CONTEXT->value_length++]);
+	} 
+	| LBRACE sub_select RBRACE {
+		value_init_select(&CONTEXT->values[CONTEXT->value_length++], &CONTEXT->selects[CONTEXT->select_length-1]);
+		CONTEXT->select_length--;
 	}
     ;
+delete_begin:
+	DELETE {
+		CONTEXT->select_length++;
+	}
+	;
 delete:		/*  delete 语句的语法解析树*/
-    DELETE FROM ID where SEMICOLON 
+    delete_begin FROM ID where SEMICOLON 
 		{
 			CONTEXT->ssql->flag = SCF_DELETE;//"delete";
 			deletes_init_relation(&CONTEXT->ssql->sstr.deletion, $3);
 			deletes_set_conditions(&CONTEXT->ssql->sstr.deletion, 
-					CONTEXT->conditions, CONTEXT->condition_length);
-			CONTEXT->condition_length = 0;	
+					CONTEXT->conditions[0], CONTEXT->condition_length[0]);
+			
+			CONTEXT->condition_length[0] = 0;	
+			CONTEXT->select_length = 0;
     }
     ;
+update_begin:
+	UPDATE {
+		CONTEXT->select_length++;
+	}
+	;
 update:			/*  update 语句的语法解析树*/
-    // UPDATE ID SET ID EQ value where SEMICOLON
-	// 	{
-	// 		CONTEXT->ssql->flag = SCF_UPDATE;//"update";
-	// 		Value *value = &CONTEXT->values[0];
-	// 		updates_init(&CONTEXT->ssql->sstr.update, $2, $4, value, 
-	// 				CONTEXT->conditions, CONTEXT->condition_length);
-	// 		CONTEXT->condition_length = 0;
-	// 	}
-    // ;
-
-	UPDATE ID SET update_set updates_sets where SEMICOLON
+	update_begin ID SET update_set updates_sets where SEMICOLON
 		{
   			CONTEXT->ssql->flag = SCF_UPDATE;//"update";
   			updates_init(&CONTEXT->ssql->sstr.update, $2, 
-						 CONTEXT->conditions, CONTEXT->condition_length);
-  			CONTEXT->condition_length = 0;
+						 CONTEXT->conditions[0], CONTEXT->condition_length[0]);
+
+  			CONTEXT->condition_length[0] = 0;
   			CONTEXT->value_length = 0;
+			CONTEXT->select_length = 0;
 		}
 	;
 
@@ -445,39 +455,45 @@ updates_sets:
 	| COMMA update_set updates_sets {
 	
 	}
-	;
-
-select:				/*  select 语句的语法解析树*/
-    SELECT select_attr FROM rel_name rel_list where order_by SEMICOLON
-		{
-			selects_append_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->conditions, CONTEXT->condition_length);
-
-			CONTEXT->ssql->flag=SCF_SELECT;
-
-			//临时变量清零
-			CONTEXT->condition_length=0;
-			CONTEXT->from_length=0;
-			CONTEXT->select_length=0;
-			CONTEXT->value_length = 0;
-			CONTEXT->join_length = 0;
+    ;
+select_begin:
+	SELECT {
+		CONTEXT->select_length++;
 	}
 	;
-
+sub_select: 
+	select_begin select_attr FROM rel_name rel_list where order_by {
+			selects_append_conditions(&CONTEXT->selects[CONTEXT->select_length-1], CONTEXT->conditions[CONTEXT->select_length-1], CONTEXT->condition_length[CONTEXT->select_length-1]);
+	}
+	;
+select:				/*  select 语句的语法解析树*/
+    sub_select SEMICOLON
+		{
+			CONTEXT->ssql->flag=SCF_SELECT;//"select";
+			CONTEXT->ssql->sstr.selection = CONTEXT->selects[0];
+			//临时变量清零
+			// CONTEXT->condition_length=0;
+			// CONTEXT->from_length=0;
+			// CONTEXT->select_length=0;
+			// CONTEXT->value_length = 0;
+			// CONTEXT->join_length = 0;
+	}
+	;
 select_attr:
     STAR attr_list {  
 			RelAttr attr;
 			relation_attr_init(&attr, NULL, "*");
-			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_append_attribute(&CONTEXT->selects[CONTEXT->select_length-1], &attr);
 		}
     | ID attr_list {
 			RelAttr attr;
 			relation_attr_init(&attr, NULL, $1);
-			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_append_attribute(&CONTEXT->selects[CONTEXT->select_length-1], &attr);
 		}
   	| ID DOT ID attr_list {
 			RelAttr attr;
 			relation_attr_init(&attr, $1, $3);
-			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_append_attribute(&CONTEXT->selects[CONTEXT->select_length-1], &attr);
 		}
 	| aggr_attr attr_list {
 
@@ -486,49 +502,49 @@ select_attr:
 attr_list:
     /* empty */
     | COMMA ID attr_list {
-			RelAttr attr;
-			relation_attr_init(&attr, NULL, $2);
-			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+		RelAttr attr;
+		relation_attr_init(&attr, NULL, $2);
+		selects_append_attribute(&CONTEXT->selects[CONTEXT->select_length-1], &attr);
 	}
     | COMMA ID DOT ID attr_list {
-			RelAttr attr;
-			relation_attr_init(&attr, $2, $4);
-			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+		RelAttr attr;
+		relation_attr_init(&attr, $2, $4);
+		selects_append_attribute(&CONTEXT->selects[CONTEXT->select_length-1], &attr);
 	}
 	| COMMA STAR attr_list {
-			RelAttr attr;
-			relation_attr_init(&attr, NULL, "*");
-			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+		RelAttr attr;
+		relation_attr_init(&attr, NULL, "*");
+		selects_append_attribute(&CONTEXT->selects[CONTEXT->select_length-1], &attr);
     }
-	| COMMA aggr_attr attr_list{
+	| COMMA aggr_attr attr_list {
 	}
   	;
 aggr_attr:
 	 aggr_type LBRACE ID extra_attr RBRACE {
 		AggrAttr attr;
 		relation_aggr_init(&attr, CONTEXT->aggr_t, 1, NULL, $3, NULL);
-		selects_append_aggr(&CONTEXT->ssql->sstr.selection, &attr);
-	  }
+		selects_append_aggr(&CONTEXT->selects[CONTEXT->select_length-1], &attr);
+	}
 	| aggr_type LBRACE ID DOT ID extra_attr RBRACE {
 		AggrAttr attr;
 		relation_aggr_init(&attr, CONTEXT->aggr_t, 1, $3, $5, NULL);
-		selects_append_aggr(&CONTEXT->ssql->sstr.selection, &attr);
-	  }
+		selects_append_aggr(&CONTEXT->selects[CONTEXT->select_length-1], &attr);
+	}
 	| aggr_type LBRACE RBRACE {
 		AggrAttr attr;
 		relation_aggr_init(&attr, INVALID, 0, NULL, NULL, NULL);
-		selects_append_aggr(&CONTEXT->ssql->sstr.selection, &attr);
-	  }
+		selects_append_aggr(&CONTEXT->selects[CONTEXT->select_length-1], &attr);
+	}
 	| aggr_type LBRACE STAR extra_attr RBRACE {
 		AggrAttr attr;
 		relation_aggr_init(&attr, CONTEXT->aggr_t == COUNT ? COUNT : INVALID, 1, NULL, "*", NULL);
-		selects_append_aggr(&CONTEXT->ssql->sstr.selection, &attr);
-	  } 
+		selects_append_aggr(&CONTEXT->selects[CONTEXT->select_length-1], &attr);
+	} 
 	| aggr_type LBRACE value extra_attr RBRACE {
 		AggrAttr attr;
 		Value *value = &CONTEXT->values[CONTEXT->value_length - 1];
 		relation_aggr_init(&attr, CONTEXT->aggr_t, 0, NULL, NULL, value);
-		selects_append_aggr(&CONTEXT->ssql->sstr.selection, &attr);
+		selects_append_aggr(&CONTEXT->selects[CONTEXT->select_length-1], &attr);
 	}
 	;
 aggr_type:
@@ -544,12 +560,11 @@ extra_attr:
 	| COMMA ID DOT ID extra_attr { CONTEXT->aggr_t = INVALID; }
 	| COMMA STAR extra_attr { CONTEXT->aggr_t = INVALID; }
 	| COMMA value extra_attr { CONTEXT->aggr_t = INVALID; }
-	;
   	;
 rel_name:
 	ID join_list {
-		selects_append_relation(&CONTEXT->ssql->sstr.selection, $1);
-		selects_arrange_relation(&CONTEXT->ssql->sstr.selection, CONTEXT->curr_join_length);
+		selects_append_relation(&CONTEXT->selects[CONTEXT->select_length-1], $1);
+		selects_arrange_relation(&CONTEXT->selects[CONTEXT->select_length-1], CONTEXT->curr_join_length);
 		CONTEXT->curr_join_length=0;
 	}
 rel_list:
@@ -566,13 +581,11 @@ join_list:
 
 inner_join:
 	INNER JOIN ID ON join_condition join_condition_list {
-		selects_append_join_relation(&CONTEXT->ssql->sstr.selection, $3);
+		selects_append_join_relation(&CONTEXT->selects[CONTEXT->select_length-1], $3);
+		selects_append_join_conditions(&CONTEXT->selects[CONTEXT->select_length-1], CONTEXT->join_conditions[CONTEXT->join_length], CONTEXT->join_conditions_length[CONTEXT->join_length]);
 		CONTEXT->join_length++;
 		CONTEXT->curr_join_length++;
-		selects_append_join_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->join_conditions[CONTEXT->join_length-1], CONTEXT->join_conditions_length[CONTEXT->join_length-1]);
-	}
-	;
-
+	};
 join_condition:
 	ID comOp value {
 		RelAttr left_attr;
@@ -581,7 +594,7 @@ join_condition:
 		Value *right_value = &CONTEXT->values[CONTEXT->value_length - 1];
 
 		Condition condition;
-		condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 0, NULL, right_value);
+		condition_init(&condition, CONTEXT->comp[CONTEXT->select_length-1], 1, &left_attr, NULL, 0, NULL, right_value);
 		CONTEXT->join_conditions[CONTEXT->join_length][CONTEXT->join_conditions_length[CONTEXT->join_length]++] = condition;
 	}
 	| value comOp value {
@@ -589,7 +602,7 @@ join_condition:
 		Value *right_value = &CONTEXT->values[CONTEXT->value_length - 1];
 
 		Condition condition;
-		condition_init(&condition, CONTEXT->comp, 0, NULL, left_value, 0, NULL, right_value);
+		condition_init(&condition, CONTEXT->comp[CONTEXT->select_length-1], 0, NULL, left_value, 0, NULL, right_value);
 		CONTEXT->join_conditions[CONTEXT->join_length][CONTEXT->join_conditions_length[CONTEXT->join_length]++] = condition;
 	}
 	| ID comOp ID {
@@ -599,7 +612,7 @@ join_condition:
 		relation_attr_init(&right_attr, NULL, $3);
 
 		Condition condition;
-		condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 1, &right_attr, NULL);
+		condition_init(&condition, CONTEXT->comp[CONTEXT->select_length-1], 1, &left_attr, NULL, 1, &right_attr, NULL);
 		CONTEXT->join_conditions[CONTEXT->join_length][CONTEXT->join_conditions_length[CONTEXT->join_length]++] = condition;
 	}
     | value comOp ID {
@@ -608,7 +621,7 @@ join_condition:
 		relation_attr_init(&right_attr, NULL, $3);
 
 		Condition condition;
-		condition_init(&condition, CONTEXT->comp, 0, NULL, left_value, 1, &right_attr, NULL);
+		condition_init(&condition, CONTEXT->comp[CONTEXT->select_length-1], 0, NULL, left_value, 1, &right_attr, NULL);
 		CONTEXT->join_conditions[CONTEXT->join_length][CONTEXT->join_conditions_length[CONTEXT->join_length]++] = condition;
 	}
     | ID DOT ID comOp value {
@@ -617,7 +630,7 @@ join_condition:
 		Value *right_value = &CONTEXT->values[CONTEXT->value_length - 1];
 
 		Condition condition;
-		condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 0, NULL, right_value);
+		condition_init(&condition, CONTEXT->comp[CONTEXT->select_length-1], 1, &left_attr, NULL, 0, NULL, right_value);
 		CONTEXT->join_conditions[CONTEXT->join_length][CONTEXT->join_conditions_length[CONTEXT->join_length]++] = condition;
 	}
     | value comOp ID DOT ID	{
@@ -627,7 +640,7 @@ join_condition:
 		relation_attr_init(&right_attr, $3, $5);
 
 		Condition condition;
-		condition_init(&condition, CONTEXT->comp, 0, NULL, left_value, 1, &right_attr, NULL);
+		condition_init(&condition, CONTEXT->comp[CONTEXT->select_length-1], 0, NULL, left_value, 1, &right_attr, NULL);
 		CONTEXT->join_conditions[CONTEXT->join_length][CONTEXT->join_conditions_length[CONTEXT->join_length]++] = condition;
     }
     | ID DOT ID comOp ID DOT ID {
@@ -637,7 +650,7 @@ join_condition:
 		relation_attr_init(&right_attr, $5, $7);
 
 		Condition condition;
-		condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 1, &right_attr, NULL);
+		condition_init(&condition, CONTEXT->comp[CONTEXT->select_length-1], 1, &left_attr, NULL, 1, &right_attr, NULL);
 		CONTEXT->join_conditions[CONTEXT->join_length][CONTEXT->join_conditions_length[CONTEXT->join_length]++] = condition;
     }
     ;
@@ -664,16 +677,16 @@ condition:
 		Value *right_value = &CONTEXT->values[CONTEXT->value_length - 1];
 
 		Condition condition;
-		condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 0, NULL, right_value);
-		CONTEXT->conditions[CONTEXT->condition_length++] = condition;
+		condition_init(&condition, CONTEXT->comp[CONTEXT->select_length-1], 1, &left_attr, NULL, 0, NULL, right_value);
+		CONTEXT->conditions[CONTEXT->select_length-1][CONTEXT->condition_length[CONTEXT->select_length-1]++] = condition;
 	}
 	| value comOp value {
 		Value *left_value = &CONTEXT->values[CONTEXT->value_length - 2];
 		Value *right_value = &CONTEXT->values[CONTEXT->value_length - 1];
 
 		Condition condition;
-		condition_init(&condition, CONTEXT->comp, 0, NULL, left_value, 0, NULL, right_value);
-		CONTEXT->conditions[CONTEXT->condition_length++] = condition;
+		condition_init(&condition, CONTEXT->comp[CONTEXT->select_length-1], 0, NULL, left_value, 0, NULL, right_value);
+		CONTEXT->conditions[CONTEXT->select_length-1][CONTEXT->condition_length[CONTEXT->select_length-1]++] = condition;
 	}
 	| ID comOp ID {
 		RelAttr left_attr;
@@ -682,8 +695,9 @@ condition:
 		relation_attr_init(&right_attr, NULL, $3);
 
 		Condition condition;
-		condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 1, &right_attr, NULL);
-		CONTEXT->conditions[CONTEXT->condition_length++] = condition;
+		condition_init(&condition, CONTEXT->comp[CONTEXT->select_length-1], 1, &left_attr, NULL, 1, &right_attr, NULL);
+
+		CONTEXT->conditions[CONTEXT->select_length-1][CONTEXT->condition_length[CONTEXT->select_length-1]++] = condition;
 	}
     | value comOp ID {
 		Value *left_value = &CONTEXT->values[CONTEXT->value_length - 1];
@@ -691,8 +705,8 @@ condition:
 		relation_attr_init(&right_attr, NULL, $3);
 
 		Condition condition;
-		condition_init(&condition, CONTEXT->comp, 0, NULL, left_value, 1, &right_attr, NULL);
-		CONTEXT->conditions[CONTEXT->condition_length++] = condition;
+		condition_init(&condition, CONTEXT->comp[CONTEXT->select_length-1], 0, NULL, left_value, 1, &right_attr, NULL);
+		CONTEXT->conditions[CONTEXT->select_length-1][CONTEXT->condition_length[CONTEXT->select_length-1]++] = condition;
 	}
     | ID DOT ID comOp value {
 		RelAttr left_attr;
@@ -700,9 +714,9 @@ condition:
 		Value *right_value = &CONTEXT->values[CONTEXT->value_length - 1];
 
 		Condition condition;
-		condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 0, NULL, right_value);
-		CONTEXT->conditions[CONTEXT->condition_length++] = condition;
-    }
+		condition_init(&condition, CONTEXT->comp[CONTEXT->select_length-1], 1, &left_attr, NULL, 0, NULL, right_value);
+		CONTEXT->conditions[CONTEXT->select_length-1][CONTEXT->condition_length[CONTEXT->select_length-1]++] = condition;
+	}
     | value comOp ID DOT ID {
 		Value *left_value = &CONTEXT->values[CONTEXT->value_length - 1];
 
@@ -710,8 +724,8 @@ condition:
 		relation_attr_init(&right_attr, $3, $5);
 
 		Condition condition;
-		condition_init(&condition, CONTEXT->comp, 0, NULL, left_value, 1, &right_attr, NULL);
-		CONTEXT->conditions[CONTEXT->condition_length++] = condition;
+		condition_init(&condition, CONTEXT->comp[CONTEXT->select_length-1], 0, NULL, left_value, 1, &right_attr, NULL);
+		CONTEXT->conditions[CONTEXT->select_length-1][CONTEXT->condition_length[CONTEXT->select_length-1]++] = condition;
     }
     | ID DOT ID comOp ID DOT ID {
 		RelAttr left_attr;
@@ -720,21 +734,23 @@ condition:
 		relation_attr_init(&right_attr, $5, $7);
 
 		Condition condition;
-		condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 1, &right_attr, NULL);
-		CONTEXT->conditions[CONTEXT->condition_length++] = condition;
-	}
+		condition_init(&condition, CONTEXT->comp[CONTEXT->select_length-1], 1, &left_attr, NULL, 1, &right_attr, NULL);
+		CONTEXT->conditions[CONTEXT->select_length-1][CONTEXT->condition_length[CONTEXT->select_length-1]++] = condition;
+    }
     ;
 comOp:
-  	  EQ { CONTEXT->comp = EQUAL_TO; }
-    | LT { CONTEXT->comp = LESS_THAN; }
-    | GT { CONTEXT->comp = GREAT_THAN; }
-    | LE { CONTEXT->comp = LESS_EQUAL; }
-    | GE { CONTEXT->comp = GREAT_EQUAL; }
-    | NE { CONTEXT->comp = NOT_EQUAL; }
-	| LK { CONTEXT->comp = LIKE; }
-	| NOT LK { CONTEXT->comp = NOT_LIKE; }
-	| IS  { CONTEXT->comp = IS_OP; }
-	| IS NOT { CONTEXT->comp = IS_NOT_OP; }
+  	  EQ { CONTEXT->comp[CONTEXT->select_length-1] = EQUAL_TO; }
+    | LT { CONTEXT->comp[CONTEXT->select_length-1] = LESS_THAN; }
+    | GT { CONTEXT->comp[CONTEXT->select_length-1] = GREAT_THAN; }
+    | LE { CONTEXT->comp[CONTEXT->select_length-1] = LESS_EQUAL; }
+    | GE { CONTEXT->comp[CONTEXT->select_length-1] = GREAT_EQUAL; }
+    | NE { CONTEXT->comp[CONTEXT->select_length-1] = NOT_EQUAL; }
+	| LK { CONTEXT->comp[CONTEXT->select_length-1] = LIKE; }
+	| NOT LK { CONTEXT->comp[CONTEXT->select_length-1] = NOT_LIKE; }
+	| IS  { CONTEXT->comp[CONTEXT->select_length-1] = IS_OP; }
+	| IS NOT { CONTEXT->comp[CONTEXT->select_length-1] = IS_NOT_OP; }
+	| IN { CONTEXT->comp[CONTEXT->select_length-1] = IN_OP; }
+	| NOT IN { CONTEXT->comp[CONTEXT->select_length-1] = NOT_IN_OP; }
     ;
 order_by:
 	/* empty */
@@ -751,13 +767,13 @@ order_attr:
 	ID direction {
 		RelAttr attr;
 		relation_attr_init(&attr, NULL, $1);
-		selects_append_order_attr(&CONTEXT->ssql->sstr.selection, &attr, CONTEXT->is_desc);
+		selects_append_order_attr(&CONTEXT->selects[CONTEXT->select_length-1], &attr, CONTEXT->is_desc);
 		CONTEXT->is_desc = 0;
 	}
 	| ID DOT ID direction {
 		RelAttr attr;
 		relation_attr_init(&attr, $1, $3);
-		selects_append_order_attr(&CONTEXT->ssql->sstr.selection, &attr, CONTEXT->is_desc);
+		selects_append_order_attr(&CONTEXT->selects[CONTEXT->select_length-1], &attr, CONTEXT->is_desc);
 		CONTEXT->is_desc = 0;
 	}
 	;
